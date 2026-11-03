@@ -1,0 +1,941 @@
+<title>Point and Teach</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the live app and agent view take two-thirds, a mechanism drawing that reacts to each step sits beside them. */
+:root {
+  --paper:#EDF0F3; --sheet:#FBFCFD; --vellum:rgba(200,81,10,.08); --ink:#15202B; --muted:#566471; --rule:#D1D8DE;
+  --human:#0B5FD6; --human-soft:rgba(11,95,214,.12); --agent:#C2500A; --agent-soft:rgba(194,80,10,.12);
+  --ok:#137A4E; --stop:#B3123E; --stop-soft:rgba(179,18,62,.1);
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif; --body:"Instrument Sans",ui-sans-serif,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#0F141A; --sheet:#171E26; --vellum:rgba(255,154,82,.09); --ink:#E6ECF2; --muted:#9AA8B5; --rule:#2B3540;
+  --human:#7AA9FF; --human-soft:rgba(122,169,255,.16); --agent:#FF9A52; --agent-soft:rgba(255,154,82,.15);
+  --ok:#4FD39A; --stop:#FF6B8A; --stop-soft:rgba(255,107,138,.14); color-scheme:dark } }
+:root[data-theme="dark"] {
+  --paper:#0F141A; --sheet:#171E26; --vellum:rgba(255,154,82,.09); --ink:#E6ECF2; --muted:#9AA8B5; --rule:#2B3540;
+  --human:#7AA9FF; --human-soft:rgba(122,169,255,.16); --agent:#FF9A52; --agent-soft:rgba(255,154,82,.15);
+  --ok:#4FD39A; --stop:#FF6B8A; --stop-soft:rgba(255,107,138,.14); color-scheme:dark }
+body { background:var(--paper); color:var(--ink); font-family:var(--body) }
+
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;font-size:15px;line-height:1.45;padding-block:24px 36px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1380px;margin:0 auto;display:grid;gap:16px}
+h1{font:700 clamp(32px,4vw,46px)/1.05 var(--display);margin:2px 0 6px;text-wrap:balance}
+h2{font:600 12px/1.3 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0}
+h3{font:600 15px/1.3 var(--body);margin:0}
+p{margin:0}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+:focus-visible{outline:2px solid var(--human);outline-offset:2px}
+
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.idea{font-size:17px;max-width:65ch}
+
+.btn{font:600 14px var(--body);color:var(--ink);background:transparent;border:1.5px solid var(--rule);border-radius:5px;padding:8px 12px;min-height:38px;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--ink)}
+.btn.primary{background:var(--human);border-color:var(--human);color:var(--sheet)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.try{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.try>span{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);align-self:center;margin-right:4px}
+.try button{flex:1 1 220px;min-width:0;text-align:left;font:500 14px var(--body);color:var(--muted);background:transparent;border:1.5px solid var(--rule);border-radius:5px;padding:8px 12px;cursor:pointer}
+.try button.active{color:var(--ink);border-color:var(--human);background:var(--human-soft)}
+.try button .tick{color:var(--ok);font-weight:700}
+
+.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px;align-items:start}
+.proto{display:grid;gap:12px;min-width:0}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1.5px solid var(--rule)}
+.tabs button{font:600 15px var(--body);color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1.5px;padding:8px 12px;cursor:pointer}
+.tabs button[aria-pressed="true"]{color:var(--human);border-bottom-color:var(--human)}
+.tabs button:disabled{cursor:not-allowed;opacity:.5}
+
+.panel{display:grid;gap:10px}
+.say label{display:block;font-weight:600;margin-bottom:4px}
+.sayrow{display:flex;flex-wrap:wrap;gap:8px}
+#phrase{flex:1 1 240px;min-width:0;font:15px var(--body);color:var(--ink);background:var(--sheet);border:1.5px solid var(--rule);border-radius:5px;padding:8px 10px;min-height:38px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font:500 14px var(--body);color:var(--human);background:var(--human-soft);border:0;border-radius:14px;padding:5px 12px;cursor:pointer}
+.chip:disabled{opacity:.5;cursor:not-allowed}
+.link{font:500 13px var(--body);color:var(--muted);background:none;border:0;padding:5px;text-decoration:underline;cursor:pointer}
+.res{display:grid;gap:4px;margin:0;min-height:24px}
+.res>div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:0 8px;align-items:baseline}
+.res dt{font:600 12.5px var(--mono);color:var(--human)}
+.res dd{margin:0;min-width:0}
+.res .why{color:var(--muted);font-size:13px}
+.msg{color:var(--muted)}
+.msg.warn{color:var(--stop)}
+
+.tag{display:inline-block;font:600 11px/1.5 var(--mono);padding:0 6px;border-radius:3px;white-space:nowrap}
+.t-und{border:1px solid var(--rule);color:var(--muted)}
+.t-draft{background:var(--agent-soft);color:var(--agent)}
+.t-irr{background:var(--stop);color:var(--sheet)}
+.t-these{background:var(--human);color:var(--sheet)}
+.t-that{border:1.5px solid var(--human);color:var(--human)}
+
+.draftbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--vellum);border:1.5px dashed var(--agent);border-radius:5px;padding:8px 12px}
+.draftbar p{flex:1 1 240px;min-width:0}
+
+.duo{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:12px;align-items:stretch}
+.inbox{container-type:inline-size;position:relative;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;min-width:0}
+.agentview{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;min-width:0;display:flex;flex-direction:column}
+.head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:10px 12px;border-bottom:1px solid var(--rule)}
+.head .hint{flex:1 1 auto;color:var(--muted);font-size:13px;text-align:right}
+.inbox>.head{position:relative;padding-right:40px}
+#home{position:absolute;right:12px;top:9px;width:18px;height:18px}
+.inbox.tracing::after{content:"Tracing paper";position:absolute;inset:0;background:var(--vellum);border:2px dashed var(--agent);border-radius:6px;pointer-events:none;font:600 11px var(--mono);color:var(--agent);padding:4px 8px;text-align:right}
+.guide{background:var(--agent-soft);border-bottom:1px solid var(--agent);padding:8px 12px;font-weight:500}
+
+#rows{user-select:none;-webkit-user-select:none}
+.mode-point #rows{touch-action:pan-y;cursor:crosshair}
+.row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:4px 10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--rule)}
+.row:last-child{border-bottom:0}
+.row.selected{background:var(--human-soft)}
+.row.pencil{box-shadow:inset 3px 0 0 var(--agent)}
+.row.guideon{background:var(--agent-soft)}
+.sel{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--muted);background:transparent;padding:0;cursor:pointer}
+.sel[aria-pressed="true"]{background:var(--human);border-color:var(--human)}
+.mode-teach .sel,.mode-compare .sel{display:none}
+.who{min-width:0}
+.who b{font-weight:600}
+.idn{font:12.5px var(--mono);color:var(--muted);margin-right:4px}
+.sub{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center}
+.sub .over{color:var(--stop)}
+.pencilt{color:var(--agent);font-weight:500}
+.amt{font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
+.acts{display:flex;gap:4px}
+.mode-compare .acts{display:none}
+.mode-compare .row{grid-template-columns:minmax(0,1fr) auto}
+.mini{font:500 13px var(--body);color:var(--ink);background:var(--sheet);border:1.5px solid var(--rule);border-radius:4px;padding:3px 9px;cursor:pointer}
+.mini:hover:not(:disabled){border-color:var(--human);color:var(--human)}
+.mini:disabled{opacity:.4;cursor:default}
+.mini.hint{border-color:var(--human);color:var(--human);background:var(--human-soft)}
+.mini.guideon{opacity:1;border-color:var(--agent);color:var(--agent);background:var(--agent-soft)}
+@media (pointer:coarse){.mini{min-height:38px;padding-inline:12px}}
+@container (max-width:440px){.row{grid-template-columns:auto minmax(0,1fr) auto}.acts{grid-column:2/-1}}
+
+#lasso{position:absolute;border:1.5px dashed var(--human);background:var(--human-soft);pointer-events:none;z-index:4}
+.ptr{position:absolute;left:0;top:0;width:18px;height:18px;z-index:6;pointer-events:none;transition:transform .55s ease}
+.ptr i{position:absolute;inset:2px}
+#dia i{background:var(--agent);transform:rotate(45deg);box-shadow:0 0 0 2px var(--sheet)}
+#hum{transition:none}
+#hum i{background:var(--human);border-radius:50%;box-shadow:0 0 0 2px var(--sheet)}
+.ptr span{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:4px;font:600 11px/16px var(--mono);padding:0 4px;background:var(--sheet);border-radius:3px;white-space:nowrap}
+#dia span{color:var(--agent)}
+#hum span{color:var(--human)}
+#dia:not(.active) span{display:none}
+
+.lines{font:12.5px/1.5 var(--mono);padding:8px 0;overflow:auto;flex:1;min-height:0}
+.lines div{padding:0 12px 0 calc(12px + 2ch);text-indent:-2ch;white-space:pre-wrap;overflow-wrap:anywhere}
+.lines .dim{color:var(--muted)}
+.lines .res{color:var(--human);font-weight:600;display:block}
+.lines .draftl{color:var(--agent)}
+.lines .humanl{color:var(--human)}
+.lines .agentl{color:var(--agent)}
+.lines .chg{animation:chg 1.8s ease-out}
+@keyframes chg{0%{background:var(--agent-soft);box-shadow:inset 3px 0 0 var(--agent)}100%{background:transparent;box-shadow:inset 3px 0 0 transparent}}
+#tok{margin-left:auto;font-size:13px;color:var(--muted)}
+
+.teachrec{display:flex;gap:8px;align-items:center}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--human);flex:none}
+.dia{display:inline-block;width:10px;height:10px;margin:1px;background:var(--agent);transform:rotate(45deg);flex:none}
+.recipe{display:grid;gap:8px;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px}
+.rule{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.rule .cond{color:var(--muted);flex:1 1 200px;min-width:0}
+.rule input,.rule select{font:12.5px var(--mono);color:var(--ink);background:var(--paper);border:1.5px solid var(--rule);border-radius:4px;padding:4px 6px;min-height:30px;width:110px}
+.acts-row{display:flex;flex-wrap:wrap;gap:8px}
+
+.flip{display:flex;flex-wrap:wrap;gap:0}
+.flip button{flex:1 1 150px;font:600 14px var(--body);color:var(--muted);background:var(--sheet);border:1.5px solid var(--rule);padding:9px 12px;min-height:40px;cursor:pointer}
+.flip button:first-child{border-radius:5px 0 0 5px}
+.flip button:last-child{border-radius:0 5px 5px 0;border-left:0}
+.flip button[aria-pressed="true"]{color:var(--agent);background:var(--agent-soft);border-color:var(--agent)}
+.flip button:last-child[aria-pressed="true"]{border-left:1.5px solid var(--agent)}
+.q{display:flex;gap:8px;align-items:center;font-weight:500;font-size:16px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:14px;align-items:start}
+.stats{display:grid;gap:8px;margin:0}
+.stats div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--rule);padding-bottom:4px}
+.stats dt{color:var(--muted)}
+.stats dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.stats dd.low{color:var(--stop)}
+.chartbox{min-width:0;background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:8px;overflow-x:auto}
+.chartbox svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);padding:0 4px 4px}
+.legend b{color:var(--agent);font-weight:600}
+.c-axis{font:13px var(--body);fill:var(--muted)}
+.c-grid{stroke:var(--rule);stroke-width:1}
+.c-now{stroke:var(--agent);stroke-width:2.5;fill:none}
+.c-other{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 4;fill:none}
+.c-dot{fill:var(--agent)}
+.c-lab{font:600 13px var(--body);fill:var(--agent)}
+
+.foot2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px}
+.foot2>div{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;min-width:0}
+.foot2 h2{padding:10px 12px 0}
+#stream,#outbox{list-style:none;margin:0;padding:6px 12px 10px;max-height:190px;overflow:auto;display:grid;gap:5px}
+#stream li,#outbox li{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:center}
+#stream .note,#outbox .note{color:var(--muted);font-size:13px}
+#stream code,#outbox code{overflow-wrap:anywhere;min-width:0}
+
+.illu{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px;min-width:0}
+.illu figure{margin:0}
+.illu svg{display:block;width:100%;max-width:440px;height:auto;margin:0 auto}
+.illu figcaption{margin-top:8px;padding-top:8px;border-top:1px solid var(--rule);font-weight:500;min-height:4.5em}
+.st{opacity:.5;transition:opacity .3s}
+.st.on{opacity:1}
+.b{fill:var(--sheet);stroke:var(--rule);stroke-width:1.5}
+.bh{stroke:var(--human)}
+.ba{fill:var(--vellum);stroke:var(--agent);stroke-width:1.5;stroke-dasharray:5 4}
+.a{stroke:var(--muted);stroke-width:1.5;fill:none}
+.a2{stroke:var(--agent);stroke-width:1.5;fill:none}
+.st.cur .a,.st.cur .a2{stroke-dasharray:6 5;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-11}}
+.mk{fill:var(--muted)}
+.mk2{fill:var(--agent)}
+.tx{font:600 13px var(--body);fill:var(--ink)}
+.ts{font:12px var(--body);fill:var(--muted)}
+.tm{font:12px var(--mono);fill:var(--ink);white-space:pre}
+.tmh{font:12px var(--mono);fill:var(--human);white-space:pre}
+.tmd{font:12px var(--mono);fill:var(--agent);white-space:pre}
+.hsay{font:500 13px var(--body);fill:var(--ink);text-anchor:middle}
+.bub{fill:var(--human-soft);stroke:var(--human);stroke-width:1.2}
+.minirow{fill:var(--rule)}
+.las{fill:var(--human-soft);stroke:var(--human);stroke-width:1.5;stroke-dasharray:4 3}
+.hp{fill:var(--human)}
+.ap{fill:var(--agent)}
+.tagf{fill:var(--human)}
+.tagt{font:600 10.5px var(--mono);fill:var(--sheet);text-anchor:middle}
+#shA,#shB{transition:opacity .25s}
+.picked .ba{stroke-width:3;stroke-dasharray:none;fill:var(--agent-soft)}
+.notpicked{opacity:.5}
+
+.notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.notes ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;max-width:65ch}
+.foot{color:var(--muted);font-size:13px;border-top:1px solid var(--rule);padding-top:10px}
+
+@media (max-width:1040px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .illu{position:static}
+  .illu figcaption{min-height:0}
+}
+@media (max-width:760px){
+  .duo,.foot2,.cmp,.notes{grid-template-columns:minmax(0,1fr)}
+  .head .hint{text-align:left}
+  .try>span{flex-basis:100%}
+}
+@media (prefers-reduced-motion:reduce){
+  .ptr,.st,#shA,#shB{transition:none}
+  .lines .chg{animation:none;background:var(--agent-soft)}
+  .st.cur .a,.st.cur .a2{animation:none;stroke-dasharray:none}
+}
+</style>
+
+<div class="wrap" id="root">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Agent-user interface prototype</p>
+      <h1>Point and Teach</h1>
+      <p class="idea">Point at things and talk, or do a task once, and the agent gets exact objects and verbs instead of guessing from a screen.</p>
+    </div>
+    <button class="btn" data-act="reset" id="reset">Reset</button>
+  </header>
+
+  <nav class="try" aria-label="Try this">
+    <span>Try this</span>
+    <button id="try-point" data-act="mode" data-mode="point"></button>
+    <button id="try-teach" data-act="mode" data-mode="teach"></button>
+    <button id="try-compare" data-act="mode" data-mode="compare"></button>
+  </nav>
+
+  <div class="grid">
+    <main class="proto">
+      <div class="tabs" role="group" aria-label="Prototype part">
+        <button id="tab-point" data-act="mode" data-mode="point">Point and say</button>
+        <button id="tab-teach" data-act="mode" data-mode="teach">Teach by doing</button>
+        <button id="tab-compare" data-act="mode" data-mode="compare">Compare outcomes</button>
+      </div>
+
+      <section class="panel" id="p-point">
+        <form class="say" id="sayForm">
+          <label for="phrase">Say what to do with the rows you point at</label>
+          <div class="sayrow">
+            <input id="phrase" autocomplete="off" placeholder="snooze these like that one">
+            <button class="btn primary" id="runBtn" type="submit" disabled>Run on tracing paper</button>
+          </div>
+        </form>
+        <div class="chips" id="chips"></div>
+        <div id="resolution" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" id="p-teach" hidden><div id="teachBody" class="panel"></div></section>
+
+      <section class="panel" id="p-compare" hidden>
+        <p class="q"><i class="dia"></i>Pay Harbor &amp; Pine this week or next? I prepared both.</p>
+        <div class="flip" role="group" aria-label="Choose a draft">
+          <button id="flipA" data-act="flip" data-opt="a">Draft A: pay this week</button>
+          <button id="flipB" data-act="flip" data-opt="b">Draft B: pay next week</button>
+        </div>
+        <div class="cmp">
+          <div class="panel">
+            <dl class="stats" id="stats"></dl>
+            <p id="delta"></p>
+            <button class="btn primary" data-act="keep" id="keepBtn"></button>
+          </div>
+          <div class="chartbox">
+            <div class="legend"><span><b>Solid line:</b> this draft</span><span>Dashed line: the other draft</span></div>
+            <div id="chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="draftbar" id="draftBar" hidden aria-live="polite"></div>
+
+      <div class="duo">
+        <div class="inbox" id="inbox">
+          <div class="head"><h2>Invoice inbox</h2><span class="hint" id="hint"></span><span id="home"></span></div>
+          <div class="guide" id="guide" hidden aria-live="polite"></div>
+          <div id="rows" role="list" aria-label="Invoices"></div>
+          <div id="lasso" hidden></div>
+          <div class="ptr active" id="hum" hidden aria-hidden="true"><i></i><span>you</span></div>
+          <div class="ptr" id="dia" aria-hidden="true"><i></i><span>agent</span></div>
+        </div>
+        <div class="agentview">
+          <div class="head"><h2>What the agent reads</h2><span id="tok"></span></div>
+          <div class="lines" id="lines"></div>
+        </div>
+      </div>
+
+      <div class="foot2">
+        <div><h2>Action stream</h2><ol id="stream"></ol></div>
+        <div><h2>Outbox</h2><ul id="outbox"></ul></div>
+      </div>
+    </main>
+
+    <aside class="illu" aria-label="How it works">
+      <figure id="fig-point">
+        <svg viewBox="0 0 360 440" role="img" aria-label="Your pointer and your words resolve to the same object IDs, shown in the app and in the agent view, before the agent runs on tracing paper.">
+          <defs><marker id="m1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="mk"/></marker>
+          <marker id="m1b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="mk2"/></marker></defs>
+          <g class="st" data-s="1">
+            <rect class="b bh" x="10" y="10" width="160" height="100" rx="6"/>
+            <text class="tx" x="22" y="31">You point</text>
+            <rect class="minirow" x="24" y="44" width="132" height="10" rx="2"/>
+            <rect class="minirow" x="24" y="60" width="132" height="10" rx="2"/>
+            <rect class="minirow" x="24" y="76" width="132" height="10" rx="2"/>
+            <rect class="las" x="18" y="39" width="112" height="52" rx="3"/>
+            <circle class="hp" cx="130" cy="91" r="6"/>
+          </g>
+          <g class="st" data-s="2">
+            <rect class="b bh" x="190" y="10" width="160" height="100" rx="6"/>
+            <text class="tx" x="202" y="31">You say</text>
+            <path class="bub" d="M204 40h132a6 6 0 0 1 6 6v38a6 6 0 0 1-6 6h-110l-10 10v-10h-12a6 6 0 0 1-6-6v-38a6 6 0 0 1 6-6z"/>
+            <text class="hsay" x="270" y="61">snooze these</text>
+            <text class="hsay" x="270" y="79">like that one</text>
+          </g>
+          <g class="st" data-s="3">
+            <path class="a" d="M90 110V148" marker-end="url(#m1)"/>
+            <text class="ts" x="98" y="134">these</text>
+            <path class="a" d="M270 110V148" marker-end="url(#m1)"/>
+            <text class="ts" x="278" y="134">that one</text>
+            <rect class="b" x="10" y="150" width="340" height="86" rx="6"/>
+            <text class="tx" x="22" y="171">Both become object IDs</text>
+            <text class="tmh" id="figThese" x="22" y="195">these    -&gt; #484 #485 #488</text>
+            <text class="tmh" id="figThat" x="22" y="216">that one -&gt; #483</text>
+            <path class="a" d="M90 236V274" marker-end="url(#m1)"/>
+            <text class="ts" x="98" y="260">drawn on rows</text>
+            <path class="a" d="M270 236V274" marker-end="url(#m1)"/>
+            <text class="ts" x="278" y="260">same IDs</text>
+            <rect class="b" x="10" y="276" width="160" height="66" rx="6"/>
+            <text class="tx" x="22" y="297">App</text>
+            <rect class="minirow" x="22" y="310" width="78" height="12" rx="2"/>
+            <rect class="tagf" x="108" y="308" width="48" height="16" rx="3"/>
+            <text class="tagt" x="132" y="320">these</text>
+            <rect class="b" x="190" y="276" width="160" height="66" rx="6"/>
+            <text class="tx" x="202" y="297">Agent view</text>
+            <text class="tmh" x="202" y="321">#484 &lt;- these</text>
+          </g>
+          <g class="st" data-s="4">
+            <path class="a" d="M90 342V378" marker-end="url(#m1)"/>
+            <text class="ts" x="98" y="365">you check</text>
+            <path class="a2" d="M270 342V378" marker-end="url(#m1b)"/>
+            <text class="ts" x="278" y="365">agent calls</text>
+            <rect class="ba" x="10" y="380" width="340" height="52" rx="6"/>
+            <path class="ap" d="M28 392l7 7l-7 7l-7-7z"/>
+            <text class="tx" x="44" y="403">Runs on tracing paper</text>
+            <text class="tmd" id="figCall" x="44" y="422">snooze(#484, until="Nov 17")</text>
+          </g>
+        </svg>
+        <figcaption id="cap-point" aria-live="polite"></figcaption>
+      </figure>
+
+      <figure id="fig-teach" hidden>
+        <svg viewBox="0 0 360 410" role="img" aria-label="Your clicks are recorded as verbs, those verbs become an editable recipe, and the recipe lets the agent repeat the task or show you the steps.">
+          <defs><marker id="m2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="mk"/></marker>
+          <marker id="m2b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="mk2"/></marker></defs>
+          <g class="st" data-s="1">
+            <rect class="b bh" x="10" y="10" width="340" height="90" rx="6"/>
+            <circle class="hp" cx="28" cy="29" r="6"/>
+            <text class="tx" x="42" y="34">You do it once</text>
+            <text class="tm" x="22" y="60">flag(#486, reason="duplicate")</text>
+            <text class="tm" x="22" y="82">snooze(#488, until="Nov 17")</text>
+          </g>
+          <g class="st" data-s="2">
+            <path class="a" d="M180 100V146" marker-end="url(#m2)"/>
+            <text class="ts" x="190" y="128">your clicks are already verbs</text>
+            <rect class="b" x="10" y="148" width="340" height="90" rx="6"/>
+            <text class="tx" x="22" y="169">Recipe you can read and edit</text>
+            <text class="tm" x="22" y="194">same amount earlier -&gt; flag</text>
+            <text class="tm" x="22" y="216">everything else     -&gt; snooze</text>
+          </g>
+          <g class="st" data-s="3">
+            <path class="a2" d="M90 238V286" marker-end="url(#m2b)"/>
+            <text class="ts" x="98" y="268">agent repeats</text>
+            <rect class="ba" x="10" y="288" width="160" height="112" rx="6"/>
+            <path class="ap" d="M28 299l7 7l-7 7l-7-7z"/>
+            <text class="tx" x="42" y="311">Does the work</text>
+            <text class="tmd" x="22" y="337">#484 snooze</text>
+            <text class="tmd" x="22" y="358">#485 flag</text>
+            <text class="ts" x="22" y="384">on tracing paper</text>
+          </g>
+          <g class="st" data-s="4">
+            <path class="a2" d="M270 238V286" marker-end="url(#m2b)"/>
+            <text class="ts" x="278" y="268">show me how</text>
+            <rect class="b" x="190" y="288" width="160" height="112" rx="6"/>
+            <path class="ap" d="M208 299l7 7l-7 7l-7-7z"/>
+            <text class="tx" x="222" y="311">Shows the steps</text>
+            <text class="ts" x="202" y="337">Its pointer replays</text>
+            <text class="ts" x="202" y="355">the task on your app</text>
+            <circle class="hp" cx="208" cy="380" r="6"/>
+            <text class="ts" x="222" y="384">You learn it</text>
+          </g>
+        </svg>
+        <figcaption id="cap-teach" aria-live="polite"></figcaption>
+      </figure>
+
+      <figure id="fig-compare" hidden>
+        <svg viewBox="0 0 360 458" role="img" aria-label="The agent prepares two drafts of one decision. You flip between them, keep one, and it waits in the outbox until your final yes reaches the real ledger.">
+          <defs><marker id="m3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="mk"/></marker>
+          <marker id="m3b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" class="mk2"/></marker></defs>
+          <g class="st" data-s="1">
+            <rect class="b" x="60" y="10" width="240" height="44" rx="6"/>
+            <path class="ap" d="M78 25l7 7l-7 7l-7-7z"/>
+            <text class="tx" x="92" y="37">This week or next?</text>
+            <path class="a2" d="M130 54L92 102" marker-end="url(#m3b)"/>
+            <path class="a2" d="M230 54L268 102" marker-end="url(#m3b)"/>
+            <text class="ts" x="180" y="90" text-anchor="middle">prepares both</text>
+            <g id="shA">
+              <rect class="ba" x="10" y="104" width="160" height="132" rx="6"/>
+              <text class="tx" x="22" y="126">Draft A</text>
+              <text class="ts" x="22" y="146">Pay this week</text>
+              <text class="tmd" x="22" y="180">late fee  $96</text>
+              <text class="tmd" x="22" y="204">low    $1,704</text>
+            </g>
+            <g id="shB">
+              <rect class="ba" x="190" y="104" width="160" height="132" rx="6"/>
+              <text class="tx" x="202" y="126">Draft B</text>
+              <text class="ts" x="202" y="146">Pay next week</text>
+              <text class="tmd" x="202" y="180">late fee $192</text>
+              <text class="tmd" x="202" y="204">low    $6,600</text>
+            </g>
+          </g>
+          <g class="st" data-s="2">
+            <path class="a" d="M70 256H290" marker-start="url(#m3)" marker-end="url(#m3)"/>
+            <circle class="hp" cx="180" cy="256" r="6"/>
+            <text class="ts" x="180" y="278" text-anchor="middle">You flip and compare results</text>
+          </g>
+          <g class="st" data-s="3">
+            <path class="a" d="M180 286V326" marker-end="url(#m3)"/>
+            <text class="ts" x="190" y="310">keep one</text>
+            <rect class="b" x="60" y="328" width="240" height="54" rx="6"/>
+            <text class="tx" x="72" y="349">Outbox</text>
+            <text class="ts" x="72" y="369">Paying is irreversible, so it waits</text>
+            <path class="a" d="M180 382V416" marker-end="url(#m3)"/>
+            <text class="ts" x="190" y="404">only after your yes</text>
+            <rect class="b bh" x="110" y="418" width="140" height="32" rx="6"/>
+            <text class="tx" x="180" y="439" text-anchor="middle">Real ledger</text>
+          </g>
+        </svg>
+        <figcaption id="cap-compare" aria-live="polite"></figcaption>
+      </figure>
+    </aside>
+  </div>
+
+  <section class="notes">
+    <div>
+      <h2>What this shows</h2>
+      <ul>
+        <li>"These" and "that one" become object IDs you can check before anything runs.</li>
+        <li>Doing a task once gives the agent exact verbs, so it doesn't need to watch a recording.</li>
+        <li>Seeing two prepared outcomes is easier than answering a question in the abstract.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What could break</h2>
+      <ul>
+        <li>"That one" can point at the wrong invoice, so the guess must stay visible before the agent acts.</li>
+        <li>One example rarely defines a rule. The agent can learn the wrong condition, so the recipe has to stay readable and editable.</li>
+        <li>A forecast can be wrong, and a tidy comparison can make it look more certain than it is.</li>
+      </ul>
+    </div>
+  </section>
+  <p class="foot">Simulated with example data. No real agent runs and no real payments are made. The agent on this page is a fixed script, and it understands only the phrases shown.</p>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+n.toLocaleString('en-US');
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STEP=REDUCED?200:850;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const DATA=[
+  {id:'#482',vendor:'Acme',amount:1240,due:'Nov 10',status:'unpaid'},
+  {id:'#483',vendor:'Birchline Supply',amount:312,due:'Oct 28',status:'overdue',snooze:'Nov 17'},
+  {id:'#484',vendor:'Harbor & Pine',amount:4800,due:'Nov 1',status:'overdue'},
+  {id:'#485',vendor:'Quillon Freight',amount:96,due:'Oct 30',status:'overdue',repeatOf:'#471'},
+  {id:'#486',vendor:'Nimbus Cleaning',amount:540,due:'Oct 15',status:'overdue',repeatOf:'#479'},
+  {id:'#487',vendor:'Ostrava Tool',amount:2175,due:'Nov 20',status:'unpaid'},
+  {id:'#488',vendor:'Tern Logistics',amount:688,due:'Oct 22',status:'overdue'},
+  {id:'#489',vendor:'Fennel Print',amount:150,due:'Nov 12',status:'unpaid'},
+];
+const PHRASES={'snooze these like that one':'snooze','flag these as duplicates':'flag','pay these':'pay'};
+const DATES=['Nov 10','Nov 17','Nov 24'];
+
+function callStr(c){
+  if(c.verb==='snooze')return `snooze(${c.id}, until="${c.arg}")`;
+  if(c.verb==='flag')return `flag(${c.id}, reason="${c.arg}")`;
+  return `pay(${c.id}, account="${c.arg}")`;
+}
+// Words and pointing become object IDs here, before anything runs.
+function resolve(text,sel,last){
+  const t=text.trim().toLowerCase().replace(/[.!?]+$/,'');
+  if(!t)return {kind:'empty'};
+  const verb=PHRASES[t];
+  if(!verb)return {kind:'unknown'};
+  if(!sel.length)return {kind:'nosel',verb};
+  const that=verb==='snooze'?last.id:null;
+  const these=sel.filter(id=>id!==that);
+  if(!these.length)return {kind:'onlythat',verb,that};
+  const arg=verb==='snooze'?last.until:verb==='flag'?'duplicate':'operating';
+  return {kind:'ok',verb,these,that,arg,risk:verb==='pay'?'irreversible':'undoable',calls:these.map(id=>({id,verb,arg}))};
+}
+// shortcut: one example per condition makes a rule, a real system needs more examples and a way to test the rule.
+function buildRecipe(actions){
+  const rules={};
+  for(const a of actions)rules[a.repeat?'repeat':'other']={verb:a.verb,arg:a.arg,example:a.id};
+  return rules;
+}
+function recipeTargets(rows,recipe){
+  return rows.filter(r=>r.status==='overdue'&&!r.flag&&!r.snooze&&!r.outbox&&recipe[r.repeatOf?'repeat':'other'])
+    .map(r=>{const m=recipe[r.repeatOf?'repeat':'other'];return {id:r.id,verb:m.verb,arg:m.arg}});
+}
+function project(opt){
+  const payDay=opt==='a'?5:12;
+  const fee=4800*.02*Math.ceil((payDay-1)/7); // 2% for each started week after the Nov 1 due date
+  const total=4800+fee;
+  const ev=[{d:6,v:-9000},{d:11,v:8000},{d:payDay,v:-total}].sort((x,y)=>x.d-y.d);
+  let c=15600;const pts=[{d:3,c}];
+  for(const e of ev){c+=e.v;pts.push({d:e.d,c})}
+  pts.push({d:14,c});
+  const low=Math.min(...pts.map(p=>p.c));
+  return {payDay,fee,total,pts,low,lowDay:pts.find(p=>p.c===low).d,end:c};
+}
+console.assert(resolve('Snooze these like that one.',['#484','#485'],{id:'#483',until:'Nov 17'}).calls.length===2,'phrase resolves to two calls');
+console.assert(resolve('snooze these like that one',['#483'],{id:'#483',until:'Nov 17'}).kind==='onlythat','that one is excluded from these');
+console.assert(resolve('hello there',['#484'],{id:'#483',until:'Nov 17'}).kind==='unknown','unknown phrase is refused');
+console.assert(resolve('pay these',['#484'],{id:'#483',until:'Nov 17'}).risk==='irreversible','pay is irreversible');
+(()=>{const rec=buildRecipe([{id:'#486',verb:'flag',arg:'duplicate',repeat:true},{id:'#488',verb:'snooze',arg:'Nov 17',repeat:false}]);
+  const rows=DATA.map(r=>({...r})).map(r=>r.id==='#486'?{...r,flag:'duplicate'}:r.id==='#488'?{...r,snooze:'Nov 17'}:r);
+  const tg=recipeTargets(rows,rec);
+  console.assert(tg.length===2&&tg[0].id==='#484'&&tg[0].verb==='snooze'&&tg[1].id==='#485'&&tg[1].verb==='flag','recipe finds #484 and #485');})();
+console.assert(project('a').fee===96&&project('a').low===1704&&project('a').end===9704,'draft A figures');
+console.assert(project('b').fee===192&&project('b').low===6600&&project('b').end===9608,'draft B figures');
+
+let S,runTok=0,prevLines=new Map();
+function fresh(mode){
+  return {mode:mode||'point',rows:DATA.map(r=>({...r})),sel:new Set(),last:{id:'#483',until:'Nov 17'},phrase:'',
+    draft:null,running:false,agentAt:null,guide:null,guideTarget:null,
+    rec:'idle',recorded:[],recipe:null,teachStage:1,
+    flip:'a',flipped:false,kept:false,outbox:[],
+    stream:[{who:'you',call:'snooze(#483, until="Nov 17")',note:'2 minutes ago',risk:'undoable'}],
+    done:{point:false,teach:false,compare:false}};
+}
+const rowOf=id=>S.rows.find(r=>r.id===id);
+const cur=()=>resolve(S.phrase,[...S.sel].sort(),S.last);
+function log(who,call,note,risk){S.stream.unshift({who,call,note,risk})}
+function setHTML(el,html){
+  const k=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.key;
+  const had=k&&el.contains(document.activeElement);
+  el.innerHTML=html;
+  if(had){const n=el.querySelector(`[data-key="${CSS.escape(k)}"]`);if(n)n.focus()}
+}
+const chip=r=>`<span class="tag ${r==='irreversible'?'t-irr':r==='draft'?'t-draft':'t-und'}">${r}</span>`;
+
+function renderRows(){
+  const r=S.mode==='point'?cur():{kind:'none'};
+  const lock=S.running||!!S.draft;
+  const p=project(S.flip);
+  setHTML($('#rows'),S.rows.map(x=>{
+    const tags=[];
+    if(r.kind==='ok'&&r.these.includes(x.id))tags.push('<span class="tag t-these">these</span>');
+    if(r.that===x.id)tags.push('<span class="tag t-that">that one</span>');
+    let line;
+    if(x.flag)line=`Flagged: ${esc(x.flag)}`;
+    else if(x.snooze)line=`Snoozed to ${esc(x.snooze)}`;
+    else line=`<span class="${x.status==='overdue'?'over':''}">${x.status==='overdue'?'Overdue':'Unpaid'}</span> &middot; due ${x.due}`;
+    if(x.repeatOf)line+=` &middot; same amount as ${x.repeatOf}`;
+    if(x.draft){
+      tags.push('<span class="tag t-draft">draft</span>');
+      tags.push(`<span class="pencilt">${x.draft.verb==='flag'?'flag: '+esc(x.draft.arg):x.draft.verb==='snooze'?'snooze to '+esc(x.draft.arg):'pay '+money(x.amount)}</span>`);
+      if(x.draft.verb==='pay')tags.push(chip('irreversible'));
+    }
+    if(x.outbox)tags.push('<span class="tag t-irr">in outbox</span>');
+    if(S.mode==='compare'&&x.id==='#484'){
+      tags.push(`<span class="tag t-draft">draft ${S.flip.toUpperCase()}</span>`,`<span class="pencilt">pay Nov ${p.payDay}</span>`,chip('irreversible'));
+    }
+    const handled=x.flag||x.snooze||x.outbox||x.draft;
+    const g=S.guideTarget&&S.guideTarget.id===x.id?S.guideTarget:null;
+    const hintV=S.rec==='on'&&!handled?(x.id==='#486'?'flag':x.id==='#488'?'snooze':''):'';
+    const btn=(verb,lab,aria)=>`<button class="mini ${hintV===verb?'hint':''} ${g&&g.verb===verb?'guideon':''}" data-act="hand" data-verb="${verb}" data-id="${x.id}" data-key="${verb}${x.id}" aria-label="${aria}" ${handled||lock?'disabled':''}>${lab}</button>`;
+    return `<div class="row ${S.sel.has(x.id)&&S.mode==='point'?'selected':''} ${x.draft?'pencil':''} ${g&&!g.verb?'guideon':''}" role="listitem" data-id="${x.id}">
+      <button class="sel" data-act="sel" data-id="${x.id}" data-key="sel${x.id}" aria-pressed="${S.sel.has(x.id)}" aria-label="Point at ${x.id}" ${lock?'disabled':''}></button>
+      <div class="who"><span class="idn">${x.id}</span><b>${esc(x.vendor)}</b><div class="sub"><span>${line}</span>${tags.join('')}</div></div>
+      <div class="amt">${money(x.amount)}</div>
+      <div class="acts">${btn('flag','Flag','Flag '+x.id+' as duplicate')}${btn('snooze','Snooze','Snooze '+x.id+' to Nov 17')}</div>
+    </div>`;
+  }).join(''));
+  $('#inbox').classList.toggle('tracing',!!S.draft);
+  $('#hint').textContent=S.draft?'':S.mode==='point'?'Drag a box over rows, or tap rows':S.mode==='teach'?'Flag and Snooze are real actions':'Example data';
+}
+
+function agentLines(){
+  const r=S.mode==='point'?cur():{kind:'none'};
+  const L=[['vh','verbs','dim'],['v1','  snooze(until)   undoable',''],['v2','  flag(reason)    undoable',''],['v3','  pay(account)    irreversible, needs human','']];
+  for(const x of S.rows){
+    const st=x.outbox?'in_outbox':x.flag?`flagged reason=${x.flag}`:x.snooze?`snoozed until=${x.snooze}`:x.status;
+    let t=`invoice${x.id} ${st} ${money(x.amount)} vendor=${x.vendor} due=${x.due}`;
+    if(x.repeatOf)t+=` repeat_of=${x.repeatOf}`;
+    let c='';
+    if(r.kind==='ok'&&r.these.includes(x.id)){t+='  <- these';c='res'}
+    if(r.that===x.id&&r.kind==='ok'){t+='  <- that one';c='res'}
+    L.push([x.id,t,c]);
+    if(x.draft)L.push([x.id+'d',`  ~ draft ${callStr(x.draft)}`,'draftl']);
+  }
+  if(S.mode==='point'){
+    L.push(['hp','human: pointing at '+(S.sel.size?[...S.sel].sort().join(', '):'nothing'),'humanl']);
+    L.push(['hl',`human: last snoozed ${S.last.id} until=${S.last.until}`,'humanl']);
+    if(S.phrase.trim())L.push(['hs',`human: said "${S.phrase.trim()}"`,'humanl']);
+  }else if(S.mode==='teach'){
+    L.push(['ht',S.rec==='on'?`human: teaching, ${S.recorded.length} actions so far`:S.rec==='done'?`human: taught a recipe with ${Object.keys(S.recipe||{}).length} rules`:'human: working by hand','humanl']);
+  }else{
+    const p=project(S.flip);
+    L.push(['cd',`draft ${S.flip.toUpperCase()} pay(#484, on=Nov ${p.payDay})  irreversible, needs human`,'draftl']);
+    L.push(['cf',`  late_fee=${money(p.fee)} cash_low=${money(p.low)} on Nov ${p.lowDay}`,'draftl']);
+    L.push(['hc',`human: viewing draft ${S.flip.toUpperCase()}`,'humanl']);
+  }
+  L.push(['ag',S.guide?'agent: showing the steps':S.agentAt?`agent: at ${S.agentAt}`:'agent: idle','agentl']);
+  return L;
+}
+function renderAgent(){
+  const L=agentLines(),next=new Map();
+  const first=prevLines.size===0;
+  const html=L.map(([k,t,c])=>{next.set(k,t);const ch=!first&&prevLines.get(k)!==t;return `<div class="${c} ${ch?'chg':''}">${esc(t)}</div>`}).join('');
+  $('#lines').innerHTML=html;prevLines=next;
+  const chars=L.reduce((n,l)=>n+l[1].length+1,0);
+  $('#tok').textContent=`about ${Math.round(chars/4)} tokens (estimate)`;
+}
+
+function renderPoint(){
+  const r=cur(),el=$('#resolution');
+  $('#runBtn').disabled=r.kind!=='ok'||S.running||!!S.draft;
+  $('#runBtn').textContent=r.verb==='pay'?'Prepare on tracing paper':'Run on tracing paper';
+  $('#phrase').disabled=S.running;
+  document.querySelectorAll('#chips .chip').forEach(b=>b.disabled=S.running||!!S.draft);
+  if(r.kind==='empty')el.innerHTML=`<p class="msg">${S.sel.size?'Good. Now pick a phrase, or type one.':'Point at rows first, then pick a phrase.'}</p>`;
+  else if(r.kind==='unknown')el.innerHTML='<p class="msg warn">This prototype only understands the phrases shown above.</p>';
+  else if(r.kind==='nosel')el.innerHTML='<p class="msg warn">"These" doesn\'t point at anything yet. Drag a box over rows, or tap rows.</p>';
+  else if(r.kind==='onlythat')el.innerHTML=`<p class="msg warn">You only pointed at ${r.that}, which is "that one". Point at some other rows too.</p>`;
+  else el.innerHTML=`<dl class="res">
+    <div><dt>these</dt><dd><code>${r.these.join(' ')}</code> <span class="why">the rows you pointed at</span></dd></div>
+    ${r.that?`<div><dt>that one</dt><dd><code>${r.that}</code> <span class="why">the last invoice you snoozed by hand</span></dd></div>`:''}
+    <div><dt>will do</dt><dd><code>${r.verb}(${r.verb==='snooze'?'until':r.verb==='flag'?'reason':'account'}="${esc(r.arg)}")</code> on ${r.these.length} ${r.these.length===1?'invoice':'invoices'} ${chip(r.risk)}</dd></div>
+  </dl>`;
+}
+
+function renderTeach(){
+  let h;
+  if(S.rec==='idle'){
+    h=`<p>Do the task by hand and the agent reads each click as a verb. There's no screen recording.</p>
+    <div class="acts-row"><button class="btn primary" data-act="rec-start" data-key="rec-start">Show the agent</button></div>`;
+  }else if(S.rec==='on'){
+    h=`<p class="teachrec"><i class="dot"></i><span>Watching you. Press <b>Flag</b> on #486, then <b>Snooze</b> on #488. ${S.recorded.length} of 2 done.</span></p>
+    <div class="acts-row"><button class="btn primary" data-act="rec-stop" data-key="rec-stop" ${S.recorded.length?'':'disabled'}>Stop and make a recipe</button></div>`;
+  }else{
+    const tg=recipeTargets(S.rows,S.recipe);
+    const n=S.recorded.length;
+    const ctl=(c,rule)=>rule.verb==='flag'
+      ?`<code>flag(reason =</code><input id="arg-${c}" data-rule="${c}" value="${esc(rule.arg)}" aria-label="Flag reason" ${S.running||S.draft?'disabled':''}><code>)</code>`
+      :`<code>snooze(until =</code><select id="arg-${c}" data-rule="${c}" aria-label="Snooze date" ${S.running||S.draft?'disabled':''}>${DATES.map(d=>`<option ${d===rule.arg?'selected':''}>${d}</option>`).join('')}</select><code>)</code>`;
+    h=`<div class="recipe"><h3>Recipe from your ${n} ${n===1?'action':'actions'}</h3>
+      ${S.recipe.repeat?`<div class="rule"><span class="cond">Overdue, same amount as an earlier invoice</span>${ctl('repeat',S.recipe.repeat)}</div>`:''}
+      ${S.recipe.other?`<div class="rule"><span class="cond">Overdue, everything else</span>${ctl('other',S.recipe.other)}</div>`:''}
+      <p class="msg">${tg.length?`Similar invoices: <code>${tg.map(t=>t.id).join(' ')}</code>`:'No similar invoices left. Reset to try again.'}</p>
+      <div class="acts-row">
+        <button class="btn primary" data-act="rec-run" data-key="rec-run" ${tg.length&&!S.running&&!S.draft?'':'disabled'}>Run on similar invoices</button>
+        <button class="btn" data-act="rec-how" data-key="rec-how" ${S.running||S.draft?'disabled':''}>Show me how</button>
+        <button class="btn" data-act="rec-again" data-key="rec-again" ${S.running||S.draft?'disabled':''}>Teach again</button>
+      </div></div>`;
+  }
+  setHTML($('#teachBody'),h);
+}
+
+function chartSVG(){
+  const W=420,x=d=>48+(d-3)*(W-48-16)/11,y=c=>170-c*(170-14)/16000;
+  const path=o=>{const p=project(o).pts;let s=`M${x(p[0].d)} ${y(p[0].c)}`;for(let i=1;i<p.length;i++)s+=`H${x(p[i].d)}V${y(p[i].c)}`;return s};
+  const other=S.flip==='a'?'b':'a',p=project(S.flip);
+  const grid=[0,8000,16000].map(v=>`<line class="c-grid" x1="48" x2="${W-16}" y1="${y(v)}" y2="${y(v)}"/><text class="c-axis" x="42" y="${y(v)+4}" text-anchor="end">$${v/1000}k</text>`).join('');
+  const ticks=[[3,'Nov 3','today'],[6,'Nov 6','payroll'],[11,'Nov 11','customer pays'],[14,'Nov 14','']].map(([d,a,b])=>`<text class="c-axis" x="${d===14?W-2:x(d)}" y="188" text-anchor="${d===14?'end':'middle'}">${a}</text>${b?`<text class="c-axis" x="${x(d)}" y="204" text-anchor="middle">${b}</text>`:''}`).join('');
+  const lx=x(p.lowDay)+8,ly=y(p.low)+(S.flip==='a'?-8:18);
+  return `<svg viewBox="0 0 ${W} 212" role="img" aria-label="Cash on hand from Nov 3 to Nov 14. Draft ${S.flip.toUpperCase()} is lowest at ${money(p.low)} on Nov ${p.lowDay}.">
+    ${grid}${ticks}
+    <path class="c-other" d="${path(other)}"/><path class="c-now" d="${path(S.flip)}"/>
+    <circle class="c-dot" cx="${x(p.lowDay)}" cy="${y(p.low)}" r="4.5"/><text class="c-lab" x="${lx}" y="${ly}">Lowest ${money(p.low)}</text>
+  </svg>`;
+}
+function renderCompare(){
+  const p=project(S.flip),q=project(S.flip==='a'?'b':'a');
+  $('#flipA').setAttribute('aria-pressed',S.flip==='a');
+  $('#flipB').setAttribute('aria-pressed',S.flip==='b');
+  $('#stats').innerHTML=`<div><dt>Payment date</dt><dd>Nov ${p.payDay}</dd></div>
+    <div><dt>Late fee</dt><dd>${money(p.fee)}</dd></div>
+    <div><dt>Lowest cash on hand</dt><dd class="${p.low<3000?'low':''}">${money(p.low)}</dd></div>
+    <div><dt>Cash on Nov 14</dt><dd>${money(p.end)}</dd></div>`;
+  $('#delta').textContent=S.flip==='a'
+    ?`Saves ${money(q.fee-p.fee)} in late fees, but your lowest cash is ${money(q.low-p.low)} lower.`
+    :`Costs ${money(p.fee-q.fee)} more in late fees, but your lowest cash is ${money(p.low-q.low)} higher.`;
+  $('#chart').innerHTML=chartSVG();
+  $('#keepBtn').disabled=S.kept===S.flip;
+  $('#keepBtn').textContent=S.kept===S.flip?`Draft ${S.flip.toUpperCase()} is in your outbox`:S.kept?`Switch outbox to draft ${S.flip.toUpperCase()}`:`Move draft ${S.flip.toUpperCase()} to my outbox`;
+}
+
+function renderDraftBar(){
+  const el=$('#draftBar');
+  if(S.running&&S.draft){
+    el.hidden=false;
+    el.innerHTML=`<i class="dia"></i><p>Agent working in slow motion on tracing paper: ${S.draft.calls.length} of ${S.draft.total}.</p><button class="btn" data-act="discard">Stop</button>`;
+  }else if(S.draft){
+    const pay=S.draft.calls.some(c=>c.verb==='pay'),n=S.draft.calls.length;
+    el.hidden=false;
+    el.innerHTML=`<i class="dia"></i><p>${n} ${n===1?'change':'changes'} on tracing paper. ${pay?'Nothing is paid.':'The real invoices have not changed.'}</p>
+      <button class="btn primary" data-act="apply" data-key="apply">${pay?'Move to outbox':'Apply to the real app'}</button><button class="btn" data-act="discard" data-key="discard">Discard</button>`;
+  }else el.hidden=true;
+}
+function renderStream(){
+  $('#stream').innerHTML=S.stream.map(s=>`<li>${s.who==='you'?'<i class="dot" title="You"></i>':'<i class="dia" title="Agent"></i>'}<code>${esc(s.call)}</code>${s.risk?chip(s.risk):''}<span class="note">${esc(s.note)}</span></li>`).join('');
+  $('#outbox').innerHTML=S.outbox.length?S.outbox.map(o=>`<li><code>${esc(o.text)}</code>${chip('irreversible')}<span class="note">Waiting for your final yes. Nothing is paid.</span></li>`).join(''):'<li><span class="note">Empty. Irreversible actions wait here for you.</span></li>';
+}
+function stage(){
+  if(S.mode==='point'){if(S.draft)return 4;if(cur().kind==='ok')return 3;if(S.sel.size)return 2;return 1}
+  if(S.mode==='teach')return S.teachStage;
+  return S.kept?3:S.flipped?2:1;
+}
+const CAPS={
+  point:['Drag a box over rows. The agent reads where you are pointing as plain text.','Your rows are known. Now say what to do with them.','Your words became object IDs. The app and the agent view show the same answer, and nothing has run.','The agent works on tracing paper. The real invoices stay as they are until you apply.'],
+  teach:['Do the task by hand. Each click is already a verb the agent can read.','Your actions became a recipe you can read and edit.','The agent repeats the recipe in slow motion on tracing paper.','The agent shows you the steps with its pointer. Nothing changes.'],
+  compare:['The agent prepared both answers as drafts instead of asking in the abstract.','Flip between drafts and watch the same numbers change.','Your choice goes to the outbox. Paying is irreversible, so it still waits for you.'],
+};
+function renderFig(){
+  const st=stage();
+  for(const m of ['point','teach','compare']){
+    const f=$('#fig-'+m);f.hidden=S.mode!==m;
+    if(S.mode===m){
+      f.querySelectorAll('.st').forEach(g=>{const s=+g.dataset.s;g.classList.toggle('on',s<=st);g.classList.toggle('cur',s===st)});
+      const cap=$('#cap-'+m),t=CAPS[m][st-1];if(cap.textContent!==t)cap.textContent=t;
+    }
+  }
+  const r=cur();
+  if(r.kind==='ok'){
+    const ids=r.these.length>4?r.these.slice(0,4).join(' ')+` +${r.these.length-4}`:r.these.join(' ');
+    $('#figThese').textContent='these    -> '+ids;
+    $('#figThat').textContent=r.that?'that one -> '+r.that:'that one -> not needed';
+    $('#figCall').textContent=callStr(r.calls[0]);
+  }
+  $('#shA').setAttribute('class',S.flip==='a'?'picked':'notpicked');
+  $('#shB').setAttribute('class',S.flip==='b'?'picked':'notpicked');
+}
+function renderShell(){
+  $('#root').className='wrap mode-'+S.mode;
+  for(const m of ['point','teach','compare']){
+    $('#p-'+m).hidden=S.mode!==m;
+    const t=$('#tab-'+m);t.setAttribute('aria-pressed',S.mode===m);t.disabled=S.running;
+    const b=$('#try-'+m);b.classList.toggle('active',S.mode===m);b.disabled=S.running;
+    b.innerHTML=(S.done[m]?'<span class="tick">&#10003;</span> ':'')+({point:'Drag a box over three rows, then pick a phrase',teach:'Show the agent: flag #486, snooze #488, then stop',compare:'Flip between two prepared payment drafts'})[m];
+  }
+}
+function renderAll(){
+  renderShell();
+  if(S.mode==='point')renderPoint();
+  if(S.mode==='teach')renderTeach();
+  if(S.mode==='compare')renderCompare();
+  renderDraftBar();renderRows();renderAgent();renderStream();renderFig();
+}
+
+function movePtr(el,target){
+  const w=$('#inbox').getBoundingClientRect(),t=target.getBoundingClientRect();
+  el.style.transform=`translate(${t.left-w.left+t.width/2-9}px,${t.top-w.top+t.height/2-9}px)`;
+}
+function home(){$('#dia').classList.remove('active');movePtr($('#dia'),$('#home'))}
+
+async function runDraft(calls){
+  const tok=++runTok;
+  S.running=true;S.draft={calls:[],total:calls.length};$('#dia').classList.add('active');
+  renderAll();
+  for(const c of calls){
+    const row=document.querySelector(`.row[data-id="${c.id}"]`);
+    movePtr($('#dia'),row.querySelector(`[data-verb="${c.verb}"]`)||row);
+    S.agentAt=c.id;renderAgent();
+    await wait(STEP);if(tok!==runTok)return;
+    rowOf(c.id).draft=c;S.draft.calls.push(c);
+    log('agent',callStr(c),'on tracing paper',c.verb==='pay'?'irreversible':'draft');
+    renderAll();
+    await wait(STEP/3);if(tok!==runTok)return;
+  }
+  S.running=false;S.agentAt=null;home();renderAll();
+}
+function clearDraft(){for(const r of S.rows)r.draft=null;S.draft=null;S.running=false;S.agentAt=null;runTok++;home()}
+function applyDraft(){
+  const calls=S.draft.calls;
+  for(const c of calls){
+    const r=rowOf(c.id);
+    if(c.verb==='flag')r.flag=c.arg;
+    else if(c.verb==='snooze')r.snooze=c.arg;
+    else{r.outbox=true;S.outbox.push({key:c.id,text:`pay(${c.id}, ${money(r.amount)})`})}
+  }
+  log('you',`apply draft (${calls.length} ${calls.length===1?'change':'changes'})`,calls.some(c=>c.verb==='pay')?'moved to outbox, nothing paid':'now real');
+  clearDraft();S.sel.clear();S.phrase='';$('#phrase').value='';$('#hum').hidden=true;
+}
+function handAct(id,verb){
+  const r=rowOf(id);
+  if(!r||S.running||S.draft||r.flag||r.snooze||r.outbox)return;
+  const arg=verb==='flag'?'duplicate':'Nov 17';
+  if(verb==='flag')r.flag=arg;else{r.snooze=arg;S.last={id,until:arg}}
+  log('you',callStr({id,verb,arg}),S.rec==='on'?'recorded as a verb':'done by hand','undoable');
+  if(S.rec==='on')S.recorded.push({id,verb,arg,repeat:!!r.repeatOf});
+  renderAll();
+}
+async function showHow(){
+  const tok=++runTok;
+  S.running=true;S.teachStage=4;S.done.teach=true;$('#dia').classList.add('active');
+  const steps=[];
+  for(const [cond,rule] of Object.entries(S.recipe)){
+    steps.push({id:rule.example,text:cond==='repeat'?`Find an overdue invoice with the same amount as an earlier one, like ${rule.example}.`:`Find any other overdue invoice, like ${rule.example}.`});
+    steps.push({id:rule.example,verb:rule.verb,text:rule.verb==='flag'?`Press Flag. The reason is "${rule.arg}".`:`Press Snooze. The date is ${rule.arg}.`});
+  }
+  for(const s of steps){
+    S.guide=s.text;S.guideTarget=s;
+    renderAll();$('#guide').hidden=false;$('#guide').textContent=s.text;
+    const row=document.querySelector(`.row[data-id="${s.id}"]`);
+    movePtr($('#dia'),s.verb?row.querySelector(`[data-verb="${s.verb}"]`):row);
+    await wait(STEP*2);if(tok!==runTok)return;
+  }
+  S.guide=null;S.guideTarget=null;S.running=false;home();renderAll();
+  $('#guide').hidden=false;$('#guide').textContent='That is the whole task. Nothing changed, because this was only a demonstration.';
+}
+
+function setMode(m){
+  if(S.running||S.mode===m)return;
+  S.mode=m;$('#guide').hidden=true;$('#hum').hidden=m!=='point'||!S.sel.size;
+  renderAll();
+}
+function setPhrase(v){S.phrase=v;renderPoint();renderRows();renderAgent();renderFig()}
+function reset(){
+  runTok++;const m=S?S.mode:'point';S=fresh(m);prevLines=new Map();
+  $('#phrase').value='';$('#hum').hidden=true;$('#guide').hidden=true;$('#lasso').hidden=true;
+  const d=$('#dia');d.style.transition='none';
+  renderAll();home();
+  void d.offsetWidth;d.style.transition='';
+}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  const a=b.dataset.act;
+  if(a==='reset')reset();
+  else if(a==='mode')setMode(b.dataset.mode);
+  else if(a==='sel'){S.sel.has(b.dataset.id)?S.sel.delete(b.dataset.id):S.sel.add(b.dataset.id);$('#hum').hidden=true;renderAll()}
+  else if(a==='hand')handAct(b.dataset.id,b.dataset.verb);
+  else if(a==='say'){$('#phrase').value=b.dataset.p;setPhrase(b.dataset.p)}
+  else if(a==='clear'){S.sel.clear();$('#hum').hidden=true;renderAll()}
+  else if(a==='apply'){applyDraft();renderAll()}
+  else if(a==='discard'){clearDraft();log('you','discard draft','nothing changed');renderAll()}
+  else if(a==='rec-start'){S.rec='on';S.recorded=[];S.teachStage=1;$('#guide').hidden=true;renderAll()}
+  else if(a==='rec-stop'){S.recipe=buildRecipe(S.recorded);S.rec='done';S.teachStage=2;renderAll()}
+  else if(a==='rec-run'){S.teachStage=3;S.done.teach=true;$('#guide').hidden=true;runDraft(recipeTargets(S.rows,S.recipe))}
+  else if(a==='rec-how')showHow();
+  else if(a==='rec-again'){S.rec='idle';S.recipe=null;S.recorded=[];S.teachStage=1;$('#guide').hidden=true;renderAll()}
+  else if(a==='flip'){if(S.flip!==b.dataset.opt){S.flip=b.dataset.opt;S.flipped=true;S.done.compare=true;renderAll()}}
+  else if(a==='keep'){
+    const p=project(S.flip);
+    S.outbox=S.outbox.filter(o=>o.key!=='cmp');
+    S.outbox.push({key:'cmp',text:`pay(#484, ${money(p.total)}, on="Nov ${p.payDay}")`});
+    S.kept=S.flip;S.done.compare=true;
+    log('you',`keep draft ${S.flip.toUpperCase()}`,'moved to outbox, nothing paid','irreversible');
+    renderAll();
+  }
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='phrase')setPhrase(e.target.value);
+  else if(e.target.dataset.rule){
+    S.recipe[e.target.dataset.rule].arg=e.target.value.trim()||'duplicate';
+  }
+});
+$('#sayForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const r=cur();
+  if(r.kind==='ok'&&!S.running&&!S.draft){S.done.point=true;runDraft(r.calls)}
+});
+$('#chips').innerHTML=Object.keys(PHRASES).map(p=>`<button class="chip" type="button" data-act="say" data-p="${p}">${p}</button>`).join('')+'<button class="link" type="button" data-act="clear">Clear pointing</button>';
+
+// Lasso: a drag boxes rows, a tap toggles one. Touch starts a box with a sideways drag, because vertical drags scroll the page.
+let drag=null;
+const rowsEl=$('#rows');
+function syncSel(){
+  document.querySelectorAll('.row').forEach(n=>{
+    const on=S.sel.has(n.dataset.id);n.classList.toggle('selected',on);
+    n.querySelector('.sel').setAttribute('aria-pressed',on);
+  });
+  renderAgent();renderPoint();renderFig();
+}
+rowsEl.addEventListener('pointerdown',e=>{
+  if(S.mode!=='point'||S.running||S.draft||e.button||e.target.closest('button'))return;
+  drag={x:e.clientX,y:e.clientY,moved:false};
+  rowsEl.setPointerCapture(e.pointerId);
+});
+rowsEl.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6)return;
+  drag.moved=true;
+  const b=$('#inbox').getBoundingClientRect(),l=Math.min(e.clientX,drag.x),r=Math.max(e.clientX,drag.x),t=Math.min(e.clientY,drag.y),bt=Math.max(e.clientY,drag.y);
+  const L=$('#lasso');L.hidden=false;
+  L.style.left=l-b.left+'px';L.style.top=t-b.top+'px';L.style.width=r-l+'px';L.style.height=bt-t+'px';
+  S.sel=new Set([...document.querySelectorAll('.row')].filter(n=>{const q=n.getBoundingClientRect();return q.top<bt&&q.bottom>t&&q.left<r&&q.right>l}).map(n=>n.dataset.id));
+  const H=$('#hum');H.hidden=false;H.style.transform=`translate(${e.clientX-b.left-9}px,${e.clientY-b.top-9}px)`;
+  syncSel();
+});
+rowsEl.addEventListener('pointerup',e=>{
+  if(!drag)return;
+  if(!drag.moved){
+    const n=document.elementFromPoint(e.clientX,e.clientY);
+    const row=n&&n.closest('.row');
+    if(row){const id=row.dataset.id;S.sel.has(id)?S.sel.delete(id):S.sel.add(id)}
+    $('#hum').hidden=true;
+  }
+  drag=null;$('#lasso').hidden=true;renderAll();
+});
+rowsEl.addEventListener('pointercancel',()=>{drag=null;$('#lasso').hidden=true});
+window.addEventListener('resize',()=>{if(!S.running)home()});
+reset();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(!S.running)home()});
+</script>

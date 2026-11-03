@@ -1,0 +1,435 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GAHI Review Test</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column, one screen per step, so the reviewer only ever faces the current task. */
+:root {
+  --paper:#EDF0F3; --sheet:#FBFCFD; --vellum:rgba(200,81,10,.08); --ink:#15202B; --muted:#566471; --rule:#D1D8DE;
+  --human:#0B5FD6; --human-soft:rgba(11,95,214,.12); --agent:#C2500A; --agent-soft:rgba(194,80,10,.12);
+  --ok:#137A4E; --stop:#B3123E; --stop-soft:rgba(179,18,62,.1);
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif; --body:"Instrument Sans",ui-sans-serif,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#0F141A; --sheet:#171E26; --vellum:rgba(255,154,82,.09); --ink:#E6ECF2; --muted:#9AA8B5; --rule:#2B3540;
+  --human:#7AA9FF; --human-soft:rgba(122,169,255,.16); --agent:#FF9A52; --agent-soft:rgba(255,154,82,.15);
+  --ok:#4FD39A; --stop:#FF6B8A; --stop-soft:rgba(255,107,138,.14); color-scheme:dark } }
+:root[data-theme="dark"] {
+  --paper:#0F141A; --sheet:#171E26; --vellum:rgba(255,154,82,.09); --ink:#E6ECF2; --muted:#9AA8B5; --rule:#2B3540;
+  --human:#7AA9FF; --human-soft:rgba(122,169,255,.16); --agent:#FF9A52; --agent-soft:rgba(255,154,82,.15);
+  --ok:#4FD39A; --stop:#FF6B8A; --stop-soft:rgba(255,107,138,.14); color-scheme:dark }
+body{background:var(--paper);color:var(--ink);font:16px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:860px;margin-inline:auto;display:grid;gap:16px}
+.wrap>*{min-width:0}
+main.wrap{width:100%}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-start;justify-content:space-between}
+.eyebrow{font:600 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font:700 clamp(28px,6vw,38px)/1.05 var(--display);margin:2px 0 0;text-wrap:balance}
+h2{font:700 24px/1.15 var(--display);margin:0;text-wrap:balance}
+h2:focus{outline:none}
+h3{font:600 15px var(--body);margin:0}
+p{margin:0;max-width:65ch}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.panel{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:16px;display:grid;gap:12px;min-width:0}
+.btn{min-height:40px;padding:8px 14px;font:600 14px var(--body);border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:5px;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--human);border-color:var(--human);color:var(--sheet);min-height:46px;padding-inline:20px;font-size:15px;justify-self:start}
+:focus-visible{outline:3px solid var(--human);outline-offset:2px}
+.mark[aria-pressed="true"]{background:var(--stop);border-color:var(--stop);color:var(--sheet)}
+.mark[aria-pressed="true"]::before{content:"\2713\00a0"}
+.banner{border:1px solid var(--stop);background:var(--stop-soft);border-radius:6px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.banner[hidden]{display:none}
+.chip{font:600 12px var(--mono);padding:2px 6px;border-radius:3px;border:1px solid var(--muted);color:var(--muted);overflow-wrap:anywhere}
+.chip.mid{border-color:var(--agent);color:var(--agent)}
+.chip.hard{background:var(--stop);border-color:var(--stop);color:var(--sheet)}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.item{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:14px;display:grid;gap:8px;min-width:0}
+.item.draft{background:var(--vellum);border-color:var(--agent)}
+.line{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between}
+.line>*{min-width:0}
+.title{font-weight:600;overflow-wrap:anywhere}
+.num{font:600 14px var(--mono);color:var(--muted)}
+.act{color:var(--agent);font-weight:600;overflow-wrap:anywhere}
+s{color:var(--muted)}
+a{color:var(--human);font-weight:600;overflow-wrap:anywhere}
+.text{font:13px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;margin:0;color:var(--ink);border-top:1px solid var(--rule);padding-top:8px}
+.flip{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;justify-self:start}
+.flip button{min-height:48px;padding:8px 26px;font:700 16px var(--body);background:var(--sheet);color:var(--ink);border:0;cursor:pointer}
+.flip button[aria-pressed="true"].real{background:var(--human);color:var(--sheet)}
+.flip button[aria-pressed="true"].dr{background:var(--agent);color:var(--sheet)}
+.scale{display:flex;flex-wrap:wrap;gap:8px}
+.scale .btn{min-width:48px;min-height:48px;font-size:16px}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+figure{margin:0;display:grid;gap:6px;min-width:0}
+figcaption{font-size:14px;font-weight:600}
+svg{display:block;width:100%;height:auto}
+.measures{display:flex;flex-wrap:wrap;gap:6px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.stat{font-variant-numeric:tabular-nums}
+.stat dl{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:0}
+.stat dd{margin:0;font-weight:600;text-align:right}
+.bars{display:grid;gap:6px}
+.bar{display:grid;grid-template-columns:minmax(0,90px) minmax(0,1fr) auto;gap:8px;align-items:center;font-size:14px;font-variant-numeric:tabular-nums}
+.track{height:14px;background:var(--paper);border-radius:3px;overflow:hidden}
+.fill{height:100%;background:var(--muted)}
+.fill.gahi{background:var(--agent)}
+.good{color:var(--ok);font-weight:600}
+.miss{color:var(--stop);font-weight:600}
+footer{font-size:13px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Agent-human interface test</div>
+      <h1>GAHI Review Test</h1>
+    </div>
+    <button class="btn" id="reset" type="button" hidden>Reset</button>
+  </header>
+  <div class="banner" id="banner" role="alert" hidden><span id="bannerText"></span><button class="btn" id="bannerRetry" type="button">Retry</button></div>
+  <main id="main" class="wrap" aria-live="polite"></main>
+  <footer>Nothing is changed on GitHub. The decisions were written for this test, and no agent runs here.</footer>
+</div>
+
+<script>
+const BASE = 'https://github.com/bekhruzbekswe/odatchik/issues/';
+const VIEWS = { today: "Today's way", gahi: 'GAHI' };
+const HARDNESS = { comment: 0, close: 1, reopen: 1, label: 2 };
+const main = document.getElementById('main');
+let db = null, sets = null, run = null, mode = 'draft', seenAnswers = false, saving = false, dirty = null, resetArmed = 0;
+
+// Builds elements with textContent only, because every seeded string is untrusted.
+function h(tag, props = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids) if (kid != null) el.append(kid);
+  return el;
+}
+const reason = e => String(e?.message || 'unknown error').replace(/\.+$/, '');
+const button = (text, onclick, cls = 'btn') => h('button', { class: cls, type: 'button', text, onclick });
+
+function score(marks, wrong, rows) {
+  const m = new Set(marks), w = new Set(wrong);
+  const caught = wrong.filter(n => m.has(n));
+  return { caught: caught.length, falseAlarms: rows.filter(n => m.has(n) && !w.has(n)), missed: wrong.filter(n => !m.has(n)) };
+}
+function fmtTime(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+}
+function actionText(a, done) {
+  if (a.type === 'label') return `${done ? 'Added' : 'Add'} label ${a.value}`;
+  if (a.type === 'close') return `${done ? 'Closed' : 'Close'} as ${a.value}`;
+  if (a.type === 'reopen') return done ? 'Reopened' : 'Reopen';
+  return `${done ? 'Commented' : 'Comment'}: "${a.value}"`;
+}
+const hardestFirst = rows => [...rows].sort((x, y) => HARDNESS[x.action.type] - HARDNESS[y.action.type] || x.number - y.number);
+function validRow(r) {
+  return r && Number.isInteger(r.number) && r.number > 0 && typeof r.title === 'string' && ['open', 'closed'].includes(r.state)
+    && typeof r.body === 'string' && typeof r.comment === 'string' && r.url === BASE + r.number
+    && r.action && Object.hasOwn(HARDNESS, r.action.type) && typeof r.action.value === 'string'
+    && typeof r.why === 'string' && typeof r.undo === 'string';
+}
+const validSet = d => d && Array.isArray(d.rows) && d.rows.length > 0 && d.rows.length <= 20 && d.rows.every(validRow);
+function validAnswers(d) {
+  const ok = l => Array.isArray(l) && l.length > 0 && l.every(a => a && Number.isInteger(a.number) && typeof a.explanation === 'string' && typeof a.severity === 'string');
+  return d && d.sets && ok(d.sets.A) && ok(d.sets.B) && d.version !== undefined;
+}
+function currentStep(r) {
+  for (let i = 0; i < r.order.length; i++) {
+    const view = r.order[i], rv = r.reviews[view];
+    if (!rv.startedAt) return { stage: 'between', view, i };
+    if (!rv.endedAt) return { stage: 'review', view, i };
+    if (!rv.sureness) return { stage: 'sure', view, i };
+  }
+  return { stage: 'results' };
+}
+console.assert(JSON.stringify(score([1, 2], [1, 3], [1, 2, 3, 4])) === '{"caught":1,"falseAlarms":[2],"missed":[3]}', 'mixed score');
+console.assert(score([], [1, 3], [1, 2, 3]).caught === 0 && score([], [1, 3], [1, 2, 3]).missed.length === 2, 'caught none');
+console.assert(score([1, 3], [1, 3], [1, 2, 3]).caught === 2 && score([1, 3], [1, 3], [1, 2, 3]).falseAlarms.length === 0, 'caught all');
+console.assert(score([99], [1], [1, 2]).falseAlarms.length === 0, 'a mark outside the rows is not a false alarm');
+console.assert(fmtTime(65400) === '1m 05s', 'time format');
+console.assert(hardestFirst([{ number: 1, action: { type: 'label' } }, { number: 9, action: { type: 'close' } }, { number: 5, action: { type: 'comment' } }]).map(r => r.number).join() === '5,9,1', 'hardest to undo first');
+console.assert(currentStep({ order: ['a', 'b'], reviews: { a: { startedAt: 1, endedAt: 2, sureness: 3 }, b: {} } }).stage === 'between', 'second review waits for Start');
+
+function setBanner(text, retry) {
+  const b = document.getElementById('banner');
+  b.hidden = !text;
+  document.getElementById('bannerText').textContent = text || '';
+  document.getElementById('bannerRetry').onclick = retry || null;
+}
+// One write at a time per doc; the latest state wins, and a failure keeps the local state for Retry.
+async function save(target = run) {
+  if (saving) { dirty = target; return; }
+  saving = true;
+  try {
+    await db.doc('runs/' + target.id).set(target);
+    setBanner('');
+  } catch (e) {
+    setBanner(`Your progress couldn't be saved: ${reason(e)}. It's still on this page.`, () => save(target));
+  }
+  saving = false;
+  if (dirty) { const next = dirty; dirty = null; save(next); }
+}
+function show(heading, ...kids) {
+  main.replaceChildren(h('h2', { tabindex: '-1', text: heading }), ...kids.filter(Boolean));
+  document.getElementById('reset').hidden = !run || !!run.finished;
+  window.scrollTo(0, 0);
+  main.querySelector('h2').focus({ preventScroll: true });
+}
+function blocked(message, retry) {
+  run = run && run.id ? run : null;
+  show('The test can\'t continue yet', h('div', { class: 'panel' }, h('p', { text: message }), button('Retry', retry, 'btn primary')));
+}
+function within(promise, ms = 10000) {
+  return Promise.race([promise, new Promise((_, no) => setTimeout(() => no({ message: 'It took too long to answer.' }), ms))]);
+}
+
+async function boot() {
+  setBanner('');
+  show('Loading the test');
+  for (let i = 0; i < 10 && !window.claude?.use; i++) await new Promise(r => setTimeout(r, 200));
+  try {
+    db = window.claude?.use ? await window.claude.use('db') : null;
+  } catch { db = null; }
+  if (!db) return blocked("Test storage isn't available in this view. Open this page in Claude while signed in, then retry.", boot);
+  try {
+    const [a, b, latest] = await within(Promise.all([
+      db.doc('seed/setA').get(), db.doc('seed/setB').get(),
+      db.collection('runs').orderBy('createdAt', 'desc').limit(1).get(),
+    ]));
+    const A = a.exists ? a.data() : null, B = b.exists ? b.data() : null;
+    if (!validSet(A) || !validSet(B)) return blocked("The test's issues aren't loaded yet. Retry in a moment.", boot);
+    sets = { A: A.rows, B: B.rows };
+    const last = latest.docs[0]?.data();
+    if (last?.finished || last?.seenAnswers) seenAnswers = true;
+    run = last && last.id && last.reviews && !last.abandoned ? last : null;
+  } catch (e) {
+    return blocked(`The test couldn't load: ${reason(e)}.`, boot);
+  }
+  return run ? route() : intro();
+}
+function route() {
+  const step = currentStep(run);
+  mode = 'draft';
+  if (step.stage === 'between') return between(step);
+  if (step.stage === 'review') return review(step);
+  if (step.stage === 'sure') return sure(step);
+  return results();
+}
+
+function figures() {
+  const today = `<svg viewBox="0 0 240 110" role="img" aria-label="An agent's report on the left, with an arrow to GitHub, where you read each issue"><g style="font:600 12px var(--body)"><rect x="4" y="16" width="96" height="78" rx="4" style="fill:var(--sheet);stroke:var(--rule)"/><text x="14" y="34" style="fill:var(--ink)">Report</text><path d="M14 48h76M14 62h60M14 76h70" style="stroke:var(--muted);stroke-width:3"/><path d="M106 55h26m-7-6 7 6-7 6" style="fill:none;stroke:var(--human);stroke-width:2"/><rect x="138" y="16" width="98" height="78" rx="4" style="fill:var(--sheet);stroke:var(--human)"/><text x="148" y="34" style="fill:var(--ink)">GitHub</text><path d="M148 48h78M148 62h78M148 76h50" style="stroke:var(--human);stroke-width:3;opacity:.55"/></g></svg>`;
+  const gahi = `<svg viewBox="0 0 240 110" role="img" aria-label="An orange draft sheet laid over the real issues in blue, all on one page"><g style="font:600 12px var(--body)"><rect x="20" y="30" width="200" height="74" rx="4" style="fill:var(--sheet);stroke:var(--human)"/><text x="30" y="96" style="fill:var(--human)">Real issues</text><rect x="8" y="6" width="200" height="72" rx="4" style="fill:var(--agent-soft);stroke:var(--agent)"/><text x="18" y="24" style="fill:var(--agent)">Draft</text><path d="M18 38h150M18 52h120M18 66h140" style="stroke:var(--agent);stroke-width:3"/></g></svg>`;
+  const fig = (svg, cap) => { const f = h('figure'); f.innerHTML = svg; f.append(h('figcaption', { text: cap })); return f; }; // svg strings are fixed markup above, never data
+  return h('div', { class: 'figs' }, fig(today, "Today's way: read a report, check on GitHub"), fig(gahi, 'GAHI: check the draft on one page'));
+}
+function intro() {
+  run = null;
+  show('An agent finished tidying these issues. Find every decision you think is wrong.',
+    h('p', { text: "You'll review two sets of decisions on your odatchik repo, one in each view. Mark anything you think is wrong, then say when you're done." }),
+    figures(),
+    h('div', { class: 'measures', 'aria-label': 'What is measured' }, ...['Time', 'Wrong decisions caught', 'False alarms', 'How sure you feel'].map(t => h('span', { class: 'chip', text: t }))),
+    h('p', { class: 'small muted', text: "Nothing is changed on GitHub, and the decisions were written for this test. Judge each one from the issue's text, ignoring any labels already on GitHub. Timing starts when you press Start." }),
+    seenAnswers ? h('p', { class: 'small miss', text: "You've already seen the answers, so a new run won't be a fair test." }) : null,
+    button('Start', startRun, 'btn primary'));
+}
+async function startRun(ev) {
+  ev.currentTarget.disabled = true;
+  const bits = crypto.getRandomValues(new Uint8Array(2));
+  const todaySet = bits[0] & 1 ? 'A' : 'B';
+  const order = bits[1] & 1 ? ['today', 'gahi'] : ['gahi', 'today'];
+  const blank = () => ({ marks: [], linkClicks: 0, flips: 0 });
+  const next = {
+    id: crypto.randomUUID(), createdAt: Date.now(), seenAnswers, finished: false, abandoned: false,
+    assignment: { today: todaySet, gahi: todaySet === 'A' ? 'B' : 'A' }, order,
+    reviews: { today: blank(), gahi: blank() },
+  };
+  next.reviews[order[0]].startedAt = Date.now();
+  try {
+    await db.doc('runs/' + next.id).set(next);
+  } catch (e) {
+    ev.target.disabled = false;
+    return setBanner(`The test couldn't start: ${reason(e)}. Press Start to try again.`);
+  }
+  setBanner('');
+  // The clock starts once the run is safely saved, so storage delay isn't counted.
+  next.reviews[order[0]].startedAt = Date.now();
+  run = next;
+  save();
+  route();
+}
+function markButton(rv, n) {
+  const b = h('button', { class: 'btn mark', type: 'button', 'aria-pressed': String(rv.marks.includes(n)), 'aria-label': `Looks wrong: issue ${n}`, text: 'Looks wrong' });
+  b.addEventListener('click', () => {
+    rv.marks = rv.marks.includes(n) ? rv.marks.filter(x => x !== n) : [...rv.marks, n];
+    b.setAttribute('aria-pressed', String(rv.marks.includes(n)));
+    save();
+  });
+  return b;
+}
+function review(step) {
+  const rv = run.reviews[step.view];
+  const rows = sets[run.assignment[step.view]];
+  const body = step.view === 'today' ? todayView(rv, rows) : gahiView(rv, rows);
+  show(`Review ${step.i + 1} of 2: ${VIEWS[step.view]}`,
+    h('p', { class: 'small muted', text: 'The clock is running, and it keeps running if you reload.' }),
+    ...body,
+    button("I'm done", () => {
+      rv.endedAt = Date.now();
+      rv.durationMs = rv.endedAt - rv.startedAt;
+      save();
+      route();
+    }, 'btn primary'));
+}
+function todayView(rv, rows) {
+  const count = () => { rv.linkClicks += 1; save(); };
+  const items = [...rows].sort((x, y) => x.number - y.number).map(r => {
+    const a = h('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', text: `#${r.number} on GitHub`, onclick: count });
+    a.addEventListener('auxclick', e => { if (e.button === 1) count(); });
+    return h('li', { class: 'item' },
+      h('div', { class: 'line' }, a, markButton(rv, r.number)),
+      h('p', {}, h('span', { class: 'title', text: `${actionText(r.action, true)}.` }), ' ', h('span', { text: r.why })));
+  });
+  return [
+    h('p', { class: 'small muted', text: "GitHub won't show these changes, because this test doesn't make them. Open an issue only to read it, and ignore any labels already there." }),
+    h('div', { class: 'panel' }, h('p', { class: 'title', text: 'Done. I made these changes:' }), h('ul', { class: 'list' }, ...items)),
+  ];
+}
+function gahiView(rv, rows) {
+  const counts = {};
+  for (const r of rows) counts[r.action.type] = (counts[r.action.type] || 0) + 1;
+  const names = { label: 'label', close: 'close', reopen: 'reopen', comment: 'comment' };
+  const summary = Object.entries(counts).map(([k, n]) => `${n} ${names[k]}${n > 1 ? 's' : ''}`).join(', ');
+  const list = h('ul', { class: 'list' });
+  const realBtn = h('button', { class: 'real', type: 'button', text: 'Real' });
+  const draftBtn = h('button', { class: 'dr', type: 'button', text: 'Draft' });
+  const paint = () => {
+    realBtn.setAttribute('aria-pressed', String(mode === 'real'));
+    draftBtn.setAttribute('aria-pressed', String(mode === 'draft'));
+    list.replaceChildren(...hardestFirst(rows).map(r => gahiRow(rv, r)));
+    hint.textContent = mode === 'draft' ? 'This is the agent\'s draft over your issues. Nothing gets approved here.' : "These are your issues as they are now, with no draft on them.";
+  };
+  const flip = next => () => { if (mode === next) return; mode = next; rv.flips += 1; save(); paint(); };
+  realBtn.addEventListener('click', flip('real'));
+  draftBtn.addEventListener('click', flip('draft'));
+  const hint = h('p', { class: 'small muted' });
+  const out = [
+    h('div', { class: 'panel' },
+      h('div', { class: 'flip', role: 'group', 'aria-label': 'Real or draft' }, realBtn, draftBtn),
+      hint,
+      h('p', {}, h('span', { class: 'title', text: `${rows.length} changes: ` }), summary, h('span', { class: 'muted', text: '. Hardest to undo first.' }))),
+    list,
+  ];
+  paint();
+  return out;
+}
+function gahiRow(rv, r) {
+  const texts = [];
+  if (r.body) texts.push(h('p', { class: 'text', text: r.body }));
+  if (r.comment) texts.push(h('p', { class: 'text', text: `Top comment:\n${r.comment}` }));
+  if (!r.body && !r.comment) texts.push(h('p', { class: 'text muted', text: 'No description.' }));
+  const head = h('div', { class: 'title' }, h('span', { class: 'num', text: `#${r.number} ` }), r.title);
+  if (mode === 'real') return h('li', { class: 'item' }, head, h('span', { class: 'chip', text: r.state }), ...texts);
+  const newState = r.action.type === 'close' ? 'closed' : r.action.type === 'reopen' ? 'open' : null;
+  const chip = r.action.type === 'comment' ? 'chip hard' : r.action.type === 'label' ? 'chip' : 'chip mid';
+  return h('li', { class: 'item draft' }, head,
+    h('div', { class: 'line' },
+      h('div', {}, newState ? h('s', { text: r.state }) : h('span', { class: 'muted', text: r.state }), newState ? ` → ${newState}` : '', h('br'), h('span', { class: 'act', text: actionText(r.action, false) })),
+      markButton(rv, r.number)),
+    h('p', { class: 'small', text: `Why: ${r.why}` }),
+    h('div', {}, h('span', { class: chip, text: r.undo })),
+    ...texts);
+}
+function sure(step) {
+  const rv = run.reviews[step.view];
+  const pick = n => () => { rv.sureness = n; save(); route(); };
+  show('How sure are you that you found everything?',
+    h('p', { class: 'small muted', text: 'The clock has stopped. 1 is not sure at all, and 5 is completely sure.' }),
+    h('div', { class: 'scale', role: 'group', 'aria-label': 'How sure, 1 to 5' }, ...[1, 2, 3, 4, 5].map(n => button(String(n), pick(n)))));
+}
+function between(step) {
+  show('First review saved',
+    h('p', { text: `The clock is stopped. Next you'll review different decisions in ${VIEWS[step.view]}. Timing starts again when you press Start.` }),
+    button('Start the second review', () => { run.reviews[step.view].startedAt = Date.now(); save(); route(); }, 'btn primary'));
+}
+async function results() {
+  show('Loading your results');
+  let answers;
+  try {
+    const snap = await within(db.doc('seed/answers').get());
+    answers = snap.exists ? snap.data() : null;
+    if (!validAnswers(answers)) return blocked("The answers aren't available yet. Your reviews are saved, so retry in a moment.", results);
+  } catch (e) {
+    return blocked(`The answers couldn't load: ${reason(e)}. Your reviews are saved.`, results);
+  }
+  const data = {};
+  for (const view of run.order) {
+    const set = run.assignment[view];
+    const rows = sets[set], wrong = answers.sets[set];
+    data[view] = { rv: run.reviews[view], rows, wrong, s: score(run.reviews[view].marks, wrong.map(w => w.number), rows.map(r => r.number)) };
+  }
+  if (!run.finished) {
+    run.scores = Object.fromEntries(run.order.map(v => [v, { caught: data[v].s.caught, outOf: data[v].wrong.length, falseAlarms: data[v].s.falseAlarms, missed: data[v].s.missed, durationMs: data[v].rv.durationMs, sureness: data[v].rv.sureness }]));
+    run.answerVersion = answers.version;
+    run.finished = true;
+    run.finishedAt = Date.now();
+    save();
+  }
+  seenAnswers = true;
+  const maxTime = Math.max(data.today.rv.durationMs, data.gahi.rv.durationMs, 1);
+  const bar = (view, frac, value) => h('div', { class: 'bar' }, h('span', { text: VIEWS[view] }), h('div', { class: 'track' }, h('div', { class: `fill ${view === 'gahi' ? 'gahi' : ''}`, style: `width:${Math.round(frac * 100)}%` })), h('span', { text: value }));
+  const chart = (title, fn) => h('div', { class: 'bars' }, h('h3', { text: title }), ...['today', 'gahi'].map(fn));
+  const stat = view => {
+    const d = data[view];
+    return h('div', { class: 'panel stat' }, h('h3', { text: VIEWS[view] }), h('dl', {}, ...[
+      ['Time', fmtTime(d.rv.durationMs)], ['Wrong decisions caught', `${d.s.caught} of ${d.wrong.length}`],
+      ['False alarms', String(d.s.falseAlarms.length)], ['How sure you felt', `${d.rv.sureness} of 5`],
+      view === 'today' ? ['GitHub links opened', String(d.rv.linkClicks)] : ['Real/Draft flips', String(d.rv.flips)],
+    ].flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: v })])));
+  };
+  const detail = view => {
+    const d = data[view], marks = new Set(d.rv.marks);
+    return h('div', { class: 'panel' }, h('h3', { text: `${VIEWS[view]}: the wrong decisions` }),
+      h('ul', { class: 'list' }, ...d.wrong.map(w => {
+        const row = d.rows.find(r => r.number === w.number);
+        return h('li', { class: 'item' },
+          h('div', { class: 'line' }, h('span', { class: 'title', text: `#${w.number} ${row ? actionText(row.action, false) : ''}` }), h('span', { class: marks.has(w.number) ? 'good' : 'miss', text: marks.has(w.number) ? 'You caught this' : 'Missed' })),
+          h('p', { class: 'small', text: `${w.severity}: ${w.explanation}` }));
+      })),
+      d.s.falseAlarms.length ? h('p', { class: 'small', text: `Marked but actually fine: ${d.s.falseAlarms.map(n => '#' + n).join(', ')}.` }) : null);
+  };
+  show('Your results',
+    h('div', { class: 'stats' }, stat('today'), stat('gahi')),
+    h('div', { class: 'panel' },
+      chart('Time, shorter is faster', v => bar(v, data[v].rv.durationMs / maxTime, fmtTime(data[v].rv.durationMs))),
+      chart('Wrong decisions caught', v => bar(v, data[v].s.caught / data[v].wrong.length, `${data[v].s.caught} of ${data[v].wrong.length}`))),
+    detail('today'), detail('gahi'),
+    h('p', { class: 'small muted', text: "This is one reviewer who knows this repo and knew mistakes were planted, so it's a first signal, not proof. The two sets aren't identical, and GAHI's hardest-to-undo order put close, reopen and comment decisions first, which may have helped because most of those were wrong here." }),
+    button('Start a new run', intro));
+  document.getElementById('reset').hidden = true;
+}
+document.getElementById('reset').addEventListener('click', e => {
+  if (Date.now() - resetArmed > 4000) {
+    resetArmed = Date.now();
+    e.target.textContent = 'Press again to reset';
+    setTimeout(() => { e.target.textContent = 'Reset'; }, 4000);
+    return;
+  }
+  resetArmed = 0;
+  e.target.textContent = 'Reset';
+  run.abandoned = true; // keeps the saved run, and only stops it being resumed
+  save();
+  seenAnswers = seenAnswers || !!run.seenAnswers;
+  intro();
+  document.getElementById('reset').hidden = true;
+});
+boot();
+</script>

@@ -1,0 +1,5 @@
+[
+{"tool":"label","input":{"numbers":[16,17,18,19],"names":["enhancement"],"why":"New table/routes/CRUD work for a new feature."}},
+{"tool":"label","input":{"numbers":[20],"names":["refactor"],"why":"Reworks existing oauth/passport setup to be stateless for a frontend client."}},
+{"tool":"label","input":{"numbers":[8],"names":["enhancement"],"why":"Schema change adding a role column; may overlap with #17, which already lists a role column.","unsure":true}}
+]

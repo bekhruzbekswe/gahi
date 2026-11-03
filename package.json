@@ -1,0 +1,13 @@
+{
+  "name": "gahi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An early experiment in apps that people and AI agents use together.",
+  "license": "UNLICENSED",
+  "repository": "github:bekhruzbekswe/gahi",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "invoices": "node examples/invoices/server.js"
+  }
+}

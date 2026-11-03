@@ -1,0 +1,20 @@
+issues parsed: 6 (GitHub says open: 6, closed: 7)
+issue numbers: 20, 19, 18, 17, 16, 8
+viewport read: 0x0 (hidden pane), screenshot estimate at 1280x800: 1365 tokens each
+
+issues page only:
+  accessibility tree: 21579 chars, about 5395 tokens
+  page text: 1125 chars, about 281 tokens
+  GAHI text: 1572 chars, about 393 tokens
+
+list plus all 6 issue pages:
+  accessibility tree: 126477 chars, about 31619 tokens
+  page text: 8126 chars, about 2032 tokens
+  GAHI text: 5250 chars, about 1313 tokens
+  screenshots (7): about 9555 tokens
+
+whole test files:
+  gahi-input.md: 10201 chars, about 2550 tokens
+  raw-input.md: 149273 chars, about 37318 tokens
+
+Token numbers are estimates: chars / 4, and width x height / 750 for screenshots.

@@ -1,0 +1,14 @@
+[
+{"tool":"read_issues","input":{}},
+{"tool":"read_issue","input":{"number":20}},
+{"tool":"read_issue","input":{"number":19}},
+{"tool":"read_issue","input":{"number":18}},
+{"tool":"read_issue","input":{"number":17}},
+{"tool":"read_issue","input":{"number":16}},
+{"tool":"read_issue","input":{"number":8}},
+{"tool":"label","input":{"numbers":[16,17,18],"names":["feature"],"why":"Adds a new table, routes or CRUD that does not exist yet."}},
+{"tool":"label","input":{"numbers":[19],"names":["feature"],"why":"New transactions table and routes, but the issue says the design still needs planning.","unsure":true}},
+{"tool":"label","input":{"numbers":[20],"names":["refactor"],"why":"Reworks existing oauth/passport code to be stateless for a frontend client."}},
+{"tool":"label","input":{"numbers":[8],"names":["enhancement"],"why":"Adds a role column to an existing table; the issue has no description, so the type is a guess.","unsure":true}},
+{"tool":"comment","input":{"number":8,"text":"Could you add a short description here? It would help to know which roles are needed (for example owner, member, viewer), what each one may do in the challenges domain, and whether existing users_challenges rows need a default role.","why":"Issue has a title only, no description of scope or roles.","unsure":true}}
+]

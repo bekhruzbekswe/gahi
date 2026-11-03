@@ -1,0 +1,5 @@
+[
+  {"tool":"label","input":{"numbers":[20],"names":["refactor"],"why":"Refactor of the passport OAuth code to make it stateless and client-ready, per the title and body.","unsure":false}},
+  {"tool":"label","input":{"numbers":[19,18,17,16],"names":["feature"],"why":"New table and routes work for the challenges/payments domain, per the title and schema in the body.","unsure":false}},
+  {"tool":"label","input":{"numbers":[8],"names":["feature"],"why":"Adds a role column for granular permissions on users_challenges. #17 also adds a role column to that table, so this may overlap.","unsure":true}}
+]
