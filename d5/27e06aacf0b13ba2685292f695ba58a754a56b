@@ -1,0 +1,81 @@
+.gitignore
+  s_71300e1edf65e2::t_fd8899cbf80078 1-4
+demos/early-prototypes/proto-draft.html
+  s_a0f082c7253d7c::t_f79fdb6e7eaf7a 1-741
+demos/early-prototypes/proto-mirror.html
+  s_a0f082c7253d7c::t_a3de67aad4a05f 1-707
+demos/early-prototypes/proto-point.html
+  s_a0f082c7253d7c::t_10cbda10bc1749 1-941
+demos/early-prototypes/proto-xray.html
+  s_a0f082c7253d7c::t_aae7ae843d2f7d 1-798
+demos/gahi-github.html
+  s_a0f082c7253d7c::t_ba6d4eaf57f0c0 1-1596
+demos/gahi-review.html
+  s_a0f082c7253d7c::t_a49d67d01e19a7 1-435
+demos/gahi.html
+  s_a0f082c7253d7c::t_01f2e9f58b5782 1-1210
+design/design-brief.md
+  s_a0f082c7253d7c::t_a49ef42d54d087 1-119
+examples/invoices/index.html
+  s_71300e1edf65e2::t_e5941ec44d54fc 1-60
+experiments/click-agent-runs/screen-haiku.json
+  s_a0f082c7253d7c::t_2ee95d825f4dcd 1-8
+experiments/click-agent-runs/screen-sonnet.json
+  s_71300e1edf65e2::t_b4360a9c89b666 1-8
+experiments/click-agent-runs/tree-haiku.json
+  s_a0f082c7253d7c::t_2c5659af287908 1-8
+experiments/click-agent-runs/tree-sonnet.json
+  s_a0f082c7253d7c::t_155122180d32a1 1-8
+experiments/real-model-runs/fixed-haiku.json
+  s_a0f082c7253d7c::t_02aae8f1417d60 1-19
+experiments/real-model-runs/fixed-sonnet.json
+  s_a0f082c7253d7c::t_35503149dcef38 1-11
+experiments/real-model-runs/run-haiku-gahi.json
+  s_a0f082c7253d7c::t_477e6ec1335238 1-5
+experiments/real-model-runs/run-haiku-raw.json
+  s_a0f082c7253d7c::t_410cb596b1ff90 1-6
+experiments/real-model-runs/run-haiku.json
+  s_a0f082c7253d7c::t_1986e3595503e4 1-239
+experiments/real-model-runs/run-sonnet-gahi.json
+  s_a0f082c7253d7c::t_c9be314d08ffc4 1-5
+experiments/real-model-runs/run-sonnet-raw.json
+  s_a0f082c7253d7c::t_55ad41b6da2350 1-14
+experiments/real-model-runs/run-sonnet.json
+  s_a0f082c7253d7c::t_20db9f7fc1680e 1-245
+experiments/real-model-runs/sizes.txt
+  s_a0f082c7253d7c::t_f499fba0b9d7c3 1-20
+kit/client.js
+  s_71300e1edf65e2::t_e7c0f078c1f8e8 1-334
+kit/gahi.js
+  s_71300e1edf65e2::t_ccb6aa7339ac49 1-399
+package.json
+  s_71300e1edf65e2::t_25940aa792068b 1-13
+research/native-platforms.md
+  s_71300e1edf65e2::t_054fa617e65499 1-137
+tools/apply-labels.py
+  s_a0f082c7253d7c::t_24357004ec292f 1-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d527e06aacf0b13ba2685292f695ba58a754a56b",
+  "prompts": {},
+  "sessions": {
+    "s_71300e1edf65e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "47b7081b-1c0b-4e65-b818-9ca5f2aceb88",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "bekhruzbekswe <174773462+bekhruzbekswe@users.noreply.github.com>"
+    },
+    "s_a0f082c7253d7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6dd9aae9-5ca5-4b10-a6f4-dc7c68af6afd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "bekhruzbekswe <174773462+bekhruzbekswe@users.noreply.github.com>"
+    }
+  }
+}
