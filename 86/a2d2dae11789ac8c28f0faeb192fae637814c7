@@ -1,0 +1,14 @@
+kit/server.test.js
+  h_970829435af72d 60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "86a2d2dae11789ac8c28f0faeb192fae637814c7",
+  "prompts": {},
+  "humans": {
+    "h_970829435af72d": {
+      "author": "bekhruzbekswe <174773462+bekhruzbekswe@users.noreply.github.com>"
+    }
+  }
+}
