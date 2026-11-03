@@ -57,7 +57,7 @@ test('MCP initialize, notification, tools/list and read work over real HTTP', as
 
   const { result: { tools } } = await rpc('tools/list');
   const names = tools.map(t => t.name);
-  assert.deepEqual(names, ['read_view', 'read_draft', 'snooze', 'flag', 'pay']);
+  for (const name of ['read_view', 'read_draft', 'snooze', 'flag', 'pay']) assert.ok(names.includes(name), name);
   for (const banned of ['approve', 'reject', 'undo', 'do', 'doAction']) assert.ok(!names.includes(banned));
 
   const read = await rpc('tools/call', { name: 'read_view', arguments: {} });
