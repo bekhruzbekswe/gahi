@@ -14,6 +14,8 @@ export function createSession({ screen, rules: startRules = defaultRules(), here
   const log = [];
   const listeners = new Set();
   const lastView = new Map();
+  // Verbs inside menus never reach the person's page, but the person can still set a rule for them.
+  const seenVerbs = new Set();
 
   const changed = () => {
     for (const fn of listeners) fn();
@@ -27,12 +29,14 @@ export function createSession({ screen, rules: startRules = defaultRules(), here
 
   async function view() {
     const snap = await screen.snapshot();
+    for (const v of [...snap.objects.flatMap(o => o.verbs), ...snap.verbs]) seenVerbs.add(v.name);
     const present = here();
     const elsewhere = present && person.url && snap.url && person.url !== snap.url;
     return { ...snap, person: { ...person, here: present }, draft, verbs: elsewhere ? [...snap.verbs, FOLLOW] : snap.verbs };
   }
 
-  const read = async (door = 'link') => render(await view(), rules, door);
+  // In turn with actions, because reading can open menus in the agent's tab.
+  const read = (door = 'link') => serial(async () => render(await view(), rules, door));
 
   // "this" is worked out at the moment of asking, so an agent's memory of the screen can't point it at the wrong thing.
   async function resolveThis(agent, verb) {
@@ -151,6 +155,7 @@ export function createSession({ screen, rules: startRules = defaultRules(), here
     log: () => log,
     problem: () => problem,
     person: () => person,
+    knownVerbs: () => [...seenVerbs],
     setRules: next => {
       rules = next;
       changed();

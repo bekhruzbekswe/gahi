@@ -144,7 +144,7 @@ export function serve({ root, files = [], port = 0, origin, api, openTab = openC
     if (pathname === '/gahi/state' && req.method === 'GET') {
       lastSeen = Date.now();
       json(res, 200, {
-        rules: session.rules(), draft: session.draft(), log: session.log(), problem: session.problem(), person: session.person(),
+        rules: session.rules(), draft: session.draft(), log: session.log(), problem: session.problem(), person: session.person(), verbs: session.knownVerbs(),
         link: token ? `${base()}/agent/${token}` : null,
       });
       return;

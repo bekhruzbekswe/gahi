@@ -116,7 +116,7 @@ function readScreen() {
     }
     for (const f of own(el, '[gahi-field]')) {
       const name = f.getAttribute('gahi-field');
-      if (!obj.fields.some(x => x.name === name)) obj.fields.push({ name, value: f.textContent.trim(), from: f.getAttribute('gahi-from') });
+      if (!obj.fields.some(x => x.name === name)) obj.fields.push({ name, value: (f.innerText || f.textContent).trim(), from: f.getAttribute('gahi-from') }); // innerText keeps a note's line breaks.
     }
     for (const v of own(el, '[gahi-verb]')) {
       if (usable(v) && !obj.verbs.some(x => x.name === v.getAttribute('gahi-verb'))) obj.verbs.push(verbInfo(v));
@@ -135,6 +135,60 @@ const plainVerb = ({ name, risk, about, after, inputs }) => ({ name, risk, about
 function snapshot() {
   const snap = readScreen();
   return { ...snap, objects: snap.objects.map(o => ({ ...o, verbs: o.verbs.map(plainVerb) })), verbs: snap.verbs.map(plainVerb) };
+}
+
+// Menus and dialogs only exist while they're open. The agent's hidden tab opens them to see what's inside,
+// which is why this never runs on the person's screen.
+const pause = ms => new Promise(resolve => { setTimeout(resolve, ms); });
+const verbEls = () => [...document.querySelectorAll('[gahi-verb]')].filter(el => !el.closest('[hidden]'));
+const triggersOf = ref => [...document.querySelectorAll('[gahi-menu]')]
+  .filter(t => !t.closest('[hidden]') && (t.closest('[gahi-object]')?.getAttribute('gahi-object') ?? undefined) === ref);
+
+async function openMenu(trigger) {
+  const before = new Set(verbEls());
+  trigger.click();
+  await settled({ quiet: 40, max: 500 });
+  return verbEls().filter(el => !before.has(el));
+}
+
+async function closeMenu(trigger, opened) {
+  const gone = async () => {
+    for (let i = 0; i < 25; i += 1) {
+      if (!opened.some(el => el.isConnected)) return true;
+      await pause(20);
+    }
+    return false;
+  };
+  if (window.__gahiEscape) window.__gahiEscape('');
+  else (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+  if (await gone()) return;
+  trigger.click();
+  await gone();
+}
+
+const menuVerbs = new Map();
+
+async function snapshotWithMenus() {
+  const snap = snapshot();
+  for (const [index, trigger] of [...document.querySelectorAll('[gahi-menu]')].entries()) {
+    if (trigger.closest('[hidden]') || !trigger.isConnected) continue;
+    const owner = trigger.closest('[gahi-object]');
+    const ref = owner?.getAttribute('gahi-object');
+    // A menu's contents follow its object's state, so it only needs opening again when that changes.
+    const key = quote(ref ? [ref, owner.getAttribute('gahi-state')] : [location.pathname, index]);
+    if (!menuVerbs.has(key)) {
+      const opened = await openMenu(trigger);
+      // A menu can also show objects with verbs of their own, and those aren't its verbs.
+      const mine = opened.filter(el => usable(el) && [null, owner].includes(el.closest('[gahi-object]')));
+      menuVerbs.set(key, mine.map(el => plainVerb(verbInfo(el))));
+      await closeMenu(trigger, opened);
+    }
+    const list = ref ? snap.objects.find(o => o.ref === ref)?.verbs : snap.verbs;
+    for (const v of menuVerbs.get(key)) {
+      if (list && !list.some(x => x.name === v.name)) list.push(v);
+    }
+  }
+  return snap;
 }
 
 function setValue(found, value) {
@@ -186,20 +240,43 @@ async function run({ object, verb, input = {}, via, reveal = false }) {
     const snap = readScreen();
     return object === undefined ? snap.verbs.find(v => v.name === verb) : snap.objects.find(o => o.ref === object)?.verbs.find(v => v.name === verb);
   };
-  let v = find();
+  let left = null;
+  const inMenus = async () => {
+    for (const trigger of triggersOf(object)) {
+      const opened = await openMenu(trigger);
+      const el = opened.find(x => x.getAttribute('gahi-verb') === verb);
+      if (el) {
+        left = { trigger, opened };
+        return verbInfo(el);
+      }
+      await closeMenu(trigger, opened);
+    }
+    return null;
+  };
+  let v = find() ?? await inMenus();
   if (!v && reveal && object !== undefined) {
-    const verbs = readScreen().objects.find(o => o.ref === object)?.verbs ?? [];
-    (verbs.find(x => x.name === via) ?? verbs.find(x => riskOf(x.risk) === 'view'))?.el.click();
+    if (via) await run({ object, verb: via });
+    else readScreen().objects.find(o => o.ref === object)?.verbs.find(x => riskOf(x.risk) === 'view')?.el.click();
     await settled();
-    v = find();
+    v = find() ?? await inMenus();
   }
   if (!v) return { error: `${object ?? 'This screen'} has no verb ${quote(verb)} right now.` };
   try {
-    await fire(v, input, find);
+    // A control in an open menu or dialog sits outside its object, so look there too once it has input.
+    await fire(v, input, () => find() ?? (() => {
+      const el = verbEls().find(x => x.getAttribute('gahi-verb') === verb);
+      return el && verbInfo(el);
+    })());
   } catch (e) {
     return { error: e.message };
   }
+  await settled({ quiet: 80, max: 800 });
+  // The person's rules already decided, so an app's own "are you sure?" gets the real yes.
+  const confirm = document.querySelector('[gahi-confirm]');
+  if (confirm && !confirm.closest('[hidden]')) confirm.click();
   await settled();
+  // Not every menu closes itself, and the next action needs a clean screen.
+  if (left?.opened.some(el => el.isConnected)) await closeMenu(left.trigger, left.opened);
   return { ok: true };
 }
 
@@ -269,6 +346,7 @@ function serverSession(key) {
     log: () => state.log,
     problem: () => state.problem,
     person: () => state.person,
+    knownVerbs: () => state.verbs ?? [],
     linkUrl: () => state.link,
     setRules: next => {
       state = { ...state, rules: next };
@@ -303,7 +381,7 @@ function serverSession(key) {
 }
 
 export function mount({ root = document.body } = {}) {
-  window.gahiScreen = Object.freeze({ snapshot, run });
+  window.gahiScreen = Object.freeze({ snapshot: window.__gahiAgentTab ? snapshotWithMenus : snapshot, run, settled: () => settled({ quiet: 500, max: 8000 }) });
   // The agent's hidden tab only needs the screen. Rules, drafts and buttons are for the person's tab.
   if (window.__gahiAgentTab) return null;
 
@@ -355,7 +433,7 @@ export function mount({ root = document.body } = {}) {
       type: 'button', text: OUTCOMES[o], 'aria-pressed': String(current === o), onclick: () => pick(o),
     })));
     const snap = readScreen();
-    const verbs = [...new Set([...snap.objects.flatMap(o => o.verbs), ...snap.verbs].map(v => v.name).concat(Object.keys(rules.verbs)))].sort();
+    const verbs = [...new Set([...snap.objects.flatMap(o => o.verbs), ...snap.verbs].map(v => v.name).concat(Object.keys(rules.verbs), session.knownVerbs()))].sort();
     return h('section', {},
       h('h2', { text: 'Rules' }),
       LEVELS.map(level => h('div', { class: 'gahi-rule' }, h('span', { text: LEVEL_LABEL[level] }),
@@ -422,7 +500,7 @@ export function mount({ root = document.body } = {}) {
     const snap = readScreen();
     const verbs = [...snap.objects.flatMap(o => o.verbs), ...snap.verbs].map(v => v.name);
     const log = session.log();
-    const nextKey = quote([session.rules(), [...new Set(verbs)], log.length, session.linkUrl?.(), linkError]);
+    const nextKey = quote([session.rules(), [...new Set(verbs)], session.knownVerbs(), log.length, session.linkUrl?.(), linkError]);
     if (nextKey === panelKey) return;
     panelKey = nextKey;
     const peek = h('pre');

@@ -22,6 +22,7 @@ export async function openTab({ url, cookies = [], storage = {}, chrome = findCh
     stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'],
   });
   let closed = false;
+  let pressEscape = () => {};
   const cleanUp = () => {
     closed = true;
     child.kill();
@@ -54,6 +55,7 @@ export async function openTab({ url, cookies = [], storage = {}, chrome = findCh
     while ((end = buffer.indexOf('\0')) >= 0) {
       const msg = JSON.parse(buffer.slice(0, end));
       buffer = buffer.slice(end + 1);
+      if (msg.method === 'Runtime.bindingCalled' && msg.params.name === '__gahiEscape') pressEscape();
       const waiter = pending.get(msg.id);
       if (!waiter) continue;
       pending.delete(msg.id);
@@ -77,6 +79,10 @@ export async function openTab({ url, cookies = [], storage = {}, chrome = findCh
   const { targetId } = await send('Target.createTarget', { url: 'about:blank', browserContextId });
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
   const tab = (method, params) => send(method, params, sessionId);
+  // Some dialogs ignore a key sent from page code, so the page asks for a real one.
+  pressEscape = () => {
+    for (const type of ['keyDown', 'keyUp']) tab('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }).catch(() => {});
+  };
 
   const evaluate = async expression => {
     const { result, exceptionDetails } = await tab('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
@@ -95,10 +101,14 @@ export async function openTab({ url, cookies = [], storage = {}, chrome = findCh
     await tab('Page.navigate', { url: new URL(address, url).href });
     await pause(50);
     await ready();
+    // The kit loads before the app has fetched its data, and an agent shouldn't read an empty screen.
+    await evaluate('window.gahiScreen.settled?.()');
   };
 
   await tab('Page.enable');
   await tab('Network.enable');
+  await tab('Runtime.enable');
+  await tab('Runtime.addBinding', { name: '__gahiEscape' });
   if (cookies.length) await tab('Network.setCookies', { cookies: cookies.map(c => ({ ...c, url })) });
   // A desktop size so desktop-only controls exist, and steady focus so rich editors take text in the background.
   await tab('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });

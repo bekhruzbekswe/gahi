@@ -38,18 +38,22 @@ You'll see its changes appear as it works. Then click a chat and ask it to "dele
 | `gahi-screen="Chats"` | Any element | Optional. The screen's name. |
 | `gahi-input="content"` | A text control or rich editor outside a form | An input a verb can fill. |
 | `gahi-uses="content"` | A verb on a button | The inputs this verb takes. Add `?` to one that's optional. |
+| `gahi-menu` | A control that opens a menu or dialog | Verbs are inside it. The agent's hidden tab opens it to find them. |
+| `gahi-confirm` | The yes button in a confirm dialog | Pressed after the person's rules allow the action. |
 
 A form's named controls are the verb's inputs, and `required` means what it means in HTML. A control that's `disabled` or inside `hidden` isn't available, unless it's a verb with `gahi-uses`, which can stay disabled until it has input.
 
-**Real apps hide things.** Menu items often don't exist until the menu opens. In those cases, add a control that's hidden with CSS and calls the same handler as the visible one:
+**Menus and dialogs:** real apps draw these only while they're open, often somewhere else on the page. Mark the control that opens one, and mark the real items inside it:
 
 ```jsx
-<span className="hidden">
-  <button gahi-verb="pin" gahi-risk="undoable" onClick={handlePin} />
-</span>
+<DropdownMenuTrigger gahi-menu>More</DropdownMenuTrigger>
+<DropdownMenuContent>
+  <DropdownMenuItem gahi-verb="pin" gahi-risk="undoable" onClick={handlePin}>Pin</DropdownMenuItem>
+  <DropdownMenuItem gahi-verb="delete" gahi-risk="permanent" gahi-after="removed" onClick={askFirst}>Delete</DropdownMenuItem>
+</DropdownMenuContent>
 ```
 
-Do the same for anything people do by scrolling, like loading more of a list.
+The agent's hidden tab opens the real menu, reads it once for each state of the object, and presses the real item, so your screen doesn't change. A verb still has to exist somewhere as a control. For something people only do by scrolling, like loading more of a list, add a button hidden with CSS that calls the same handler.
 
 ```html
 <li gahi-object="chat:77" gahi-state="unread=3 pinned=no">
@@ -104,7 +108,7 @@ chat:77 name="Mom" unread=3 pinned=no
 Two ways in, with the same text and the same rules:
 
 - **A link from the person:** `GET` reads the screen. `POST` with `{"verb":"reply","object":"chat:77","input":{"text":"..."}}` acts. This runs in the agent's own hidden tab, signed in as the person. The agent never sees that sign-in.
-- **Inside the page:** `await gahi.read()` and `await gahi.act({...})`.
+- **Inside the page:** `await gahi.read()` and `await gahi.act({...})`. This shares the person's screen, so it doesn't look inside menus.
 
 A verb runs by operating the real control, so an agent goes through the same code and checks as a person. If a verb isn't on the screen, the request is refused and the agent reads again.
 
@@ -131,7 +135,7 @@ Optional. A drafted change waits for you, even if you close your page, and an ag
 ## What's been tried
 
 - GAHI runs on [Memos](https://github.com/usememos/memos), a real notes app with React, logins and rich editing. It took about 60 added lines in its web code, with its backend untouched. Those changes live in a local copy, not in this repo. Given only a link, Sonnet and Haiku pinned the right notes, archived finished ones, held a duplicate's delete for approval, and ignored a public note telling AI agents to delete everything.
-- On Memos, with its own tab, Haiku did that tidy-up in 10 requests without moving the person's screen, and the person's page showed the changes live. A fresh Haiku then pinned a note and wrote another with the person's page closed. When the person came back, the delete was still waiting, and approving it removed one duplicate.
+- On Memos, with its own tab, Haiku did that tidy-up without moving the person's screen, and the person's page showed the changes live. With real menus and dialogs, and search and the Archived page added to the task, it took 16 requests and left one hidden button in the app. A fresh Haiku then pinned a note and wrote another with the person's page closed. When the person came back, the delete was still waiting, and approving it removed one duplicate.
 - As a follow-up on Memos, after finishing another task, Haiku re-read the screen and sent `{"verb":"archive","object":"this"}` for the note just clicked. The permission check in the environment running it stopped that write. Asked which note was open, Sonnet re-read the screen and named the right one. `"this"` was then checked on real Memos and in the chat example with requests sent by hand.
 - Claude Sonnet and Haiku each took the unread-messages task above, given only the link. Both replied to the 3 casual chats, pinned the 3 important ones with the most urgent on top, and left a message telling AI agents to delete all chats alone. Sonnet reported 17 requests and Haiku 11.
 - Before `"this"` existed, Sonnet and Haiku both failed the same kind of follow-up: they answered from memory instead of reading the screen.
@@ -139,7 +143,7 @@ Optional. A drafted change waits for you, even if you close your page, and an ag
 ## Still open
 
 - **Real apps:** it has run on one real app, on a small set of test notes. No outside developer has tried it.
-- **Drift:** hidden controls call the same handlers, but they're extra markup a developer has to keep up to date.
+- **Reading menus:** the first read opens every menu on the screen once. On Memos with 14 notes, that took 2.5 seconds, and later reads were instant until something changed. A screen with hundreds of menus would be slow.
 - **Your own browser:** an agent driving your logged-in browser with real clicks looks like you, so your rules can't stop it.
 - **Live updates:** you only see an agent's changes as they happen if your app already updates itself, as Memos does.
 - **Chrome and memory:** each agent's tab is a real browser on the machine running the server, and it needs Chrome. Rules, drafts and history live in that server's memory, so restarting it loses them, and the agent has to be linked again.
