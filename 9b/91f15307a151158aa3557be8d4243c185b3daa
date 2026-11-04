@@ -1,0 +1,43 @@
+README.md
+  s_71300e1edf65e2::t_f91fcdaa138f04 11,18,22,39-40,42-52,82-83,86,100,106-107,123,127,131-133,135,139-140,142-145,148
+gahi/chrome.js
+  s_71300e1edf65e2::t_c6b88de7b8ae6f 1-133
+gahi/chrome.test.js
+  s_71300e1edf65e2::t_5407b122381dce 1-67
+gahi/example/chat.js
+  s_71300e1edf65e2::t_69e4f638fa5f1b 14-40,52-55,57,60-62,66-67,72,82-83,88,94-95,97,106-108,121-130,133-134
+gahi/example/main.js
+  s_71300e1edf65e2::t_8eec20641fd91a 4-13
+gahi/example/server.js
+  s_71300e1edf65e2::t_bc2d0ce570dcf2 2-3,6-36
+gahi/language.js
+  s_71300e1edf65e2::t_3ec55cb918fd8b 30-42,46,48-49,51-53,57,61-62,64-66
+gahi/language.test.js
+  s_71300e1edf65e2::t_8c453e7c9c2acd 65-68,83-86,103-111
+gahi/page.js
+  s_71300e1edf65e2::t_94b9422aa8de6b 1-4,47-65,82-90,93-105,122,127,129,133-156,164-169,172-215,228-240,242-311,318-319,329,343,348,353,357-358,362,364,370,379-380,389,396,398-409,422-425,428-429,435,455-456,470,472,480-481,486-507,509-512,514,518,520,560-561,565
+gahi/server.js
+  s_71300e1edf65e2::t_010c95fe61f159 1-2,4,8-10,16-17,27,29,32,40,49,61-91,96,99,102-106,108-123,125-132,134-148,151-190,195-198,205,210,213,219,225,229-230,247,258-266
+gahi/server.test.js
+  s_71300e1edf65e2::t_db4cbcf00e585e 8,10-27,30-33,35,38-43,53-57,59-62,65-76,79-84,87-109,113-148,152-156,161-182,186-187
+gahi/session.js
+  s_71300e1edf65e2::t_9b5e71ed62c999 1-124
+gahi/session.test.js
+  s_71300e1edf65e2::t_27c9c50e96a213 1-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9b91f15307a151158aa3557be8d4243c185b3daa",
+  "prompts": {},
+  "sessions": {
+    "s_71300e1edf65e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "47b7081b-1c0b-4e65-b818-9ca5f2aceb88",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "bekhruzbekswe <174773462+bekhruzbekswe@users.noreply.github.com>"
+    }
+  }
+}
