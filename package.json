@@ -2,12 +2,12 @@
   "name": "gahi",
   "version": "0.1.0",
   "private": true,
-  "description": "An early experiment in apps that people and AI agents use together.",
+  "description": "A common language that lets AI agents use an app from its screen.",
   "license": "UNLICENSED",
   "repository": "github:bekhruzbekswe/gahi",
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "invoices": "node examples/invoices/server.js"
+    "chat": "node examples/chat/server.js"
   }
 }
