@@ -62,10 +62,10 @@ test('state parses into pairs', () => {
 });
 
 test('the text shows verbs, risk, outcomes, the person and how to act', () => {
-  const text = render(snap({ person: { on: 'chat:1', pointing: 'message:2' } }), defaultRules());
-  assert.match(text, /^GAHI 0\.1\./);
-  assert.match(text, /POST this URL with JSON such as \{"verb":"reply","object":"chat:1","input":\{"text":"\.\.\."\}\}/);
-  assert.match(text, /person: on chat:1, pointing at message:2/);
+  const text = render(snap({ person: { on: 'chat:9', pointing: 'chat:1' } }), defaultRules());
+  assert.match(text, /^GAHI 0\.1\. This is your own screen of the app/);
+  assert.match(text, /POST this URL with JSON such as \{"verb":"pin","object":"chat:1"\} or \{"verb":"reply","object":"chat:1","input":\{"text":"\.\.\."\}\}\./);
+  assert.match(text, /person: on chat:9 \(not on your screen\), pointing at chat:1/);
   assert.match(text, /rules: view=do undoable=do outward=do permanent=draft/);
   assert.match(text, /chat:1 name="Mom" unread=2 pinned=no/);
   assert.match(text, /^ {2}open\(\) {2}view$/m);
@@ -78,6 +78,10 @@ test('the person line is always there, so an agent knows to look for it', () => 
   assert.match(render(snap(), defaultRules()), /^person: not on anything yet$/m);
   assert.match(render(snap(), defaultRules()), /When they say "this", read this again/);
   assert.match(render(snap({ person: { pointing: 'chat:1' } }), defaultRules()), /^person: pointing at chat:1$/m);
+});
+
+test('when the person has left, the text says so', () => {
+  assert.match(render(snap({ person: { on: 'chat:1', here: false } }), defaultRules()), /^person: not here right now$/m);
 });
 
 test('someone else\'s text stays data, on one line, and marked', () => {
@@ -96,5 +100,13 @@ test('a blocked verb and drafted changes appear in the text', () => {
 });
 
 test('in a page, the text says to use the page API', () => {
-  assert.match(render(snap(), defaultRules(), 'page'), /call gahi\.act\(\{"verb":"reply"/);
+  assert.match(render(snap(), defaultRules(), 'page'), /call gahi\.act\(\{"verb":"pin","object":"chat:1"\}\) or gahi\.act\(\{"verb":"reply"/);
+});
+
+test('the examples always show how to name an object, even when only a screen verb takes input', () => {
+  const memos = snap({
+    objects: [{ ref: 'memo:1', in: null, state: [], fields: [], verbs: [{ name: 'edit', risk: 'view', inputs: [] }, { name: 'pin', risk: 'undoable', inputs: [] }] }],
+    verbs: [{ name: 'create-note', risk: 'undoable', inputs: [{ name: 'content', required: true }] }],
+  });
+  assert.match(render(memos, defaultRules()), /\{"verb":"pin","object":"memo:1"\} or \{"verb":"create-note","input":\{"content":"\.\.\."\}\}/);
 });

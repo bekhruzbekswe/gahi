@@ -1,6 +1,7 @@
-// Runs in the app's page. Reads the gahi-* attributes on the screen, turns them into the agent's text,
-// and runs an agent's verbs through the real controls, so the two can't drift apart.
-import { LEVELS, VERSION, decide, defaultRules, parseState, render, riskOf } from './language.js';
+// Runs in the app's page. Reads the gahi-* attributes on the screen, and runs verbs through the real
+// controls, so an agent's view can't drift from the UI. Everything visible here appears only when needed.
+import { LEVELS, VERSION, defaultRules, parseState, riskOf } from './language.js';
+import { createSession } from './session.js';
 
 const STYLE = `
 .gahi-ui[hidden]{display:none!important}
@@ -41,8 +42,26 @@ const STYLE = `
 
 const LEVEL_LABEL = { view: 'Looking around', undoable: 'Easy to undo', outward: 'Reaches other people', permanent: 'Can\'t be undone' };
 const OUTCOMES = { do: 'Do', draft: 'Draft', block: 'Block' };
-const tick = () => new Promise(resolve => { setTimeout(resolve, 30); });
 const quote = JSON.stringify;
+
+// Apps fetch and re-render after a click, so wait until the screen has stopped changing.
+const settled = ({ quiet = 200, max = 2000 } = {}) => new Promise(resolve => {
+  let timer;
+  let limit;
+  const done = () => {
+    observer.disconnect();
+    clearTimeout(timer);
+    clearTimeout(limit);
+    resolve();
+  };
+  const observer = new MutationObserver(() => {
+    clearTimeout(timer);
+    timer = setTimeout(done, quiet);
+  });
+  observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true });
+  timer = setTimeout(done, quiet);
+  limit = setTimeout(done, max);
+});
 
 // All content goes in as text, because agent input and app fields can hold anything.
 function h(tag, props = {}, ...kids) {
@@ -60,18 +79,30 @@ function h(tag, props = {}, ...kids) {
 const own = (el, selector) => [...(el.matches(selector) ? [el] : []), ...el.querySelectorAll(selector)]
   .filter(n => n.closest('[gahi-object]') === el && !n.closest('[hidden]'));
 
-function verbInfo(el) {
-  return {
-    el,
-    name: el.getAttribute('gahi-verb'),
-    risk: el.getAttribute('gahi-risk'),
-    about: el.getAttribute('gahi-about'),
-    after: el.getAttribute('gahi-after'),
-    inputs: el.tagName === 'FORM' ? [...el.elements].filter(c => c.name).map(c => ({ name: c.name, required: c.required })) : [],
-  };
+function inputsOf(el) {
+  if (el.tagName === 'FORM') return [...el.elements].filter(c => c.name).map(c => ({ name: c.name, required: c.required, control: c }));
+  // Rich editors and controls outside a form name themselves with gahi-input, and a verb names them with gahi-uses.
+  const scope = el.closest('[gahi-object]');
+  return (el.getAttribute('gahi-uses') ?? '').split(/\s+/).filter(Boolean).map(word => {
+    const name = word.replace(/\?$/, '');
+    const control = [...document.querySelectorAll('[gahi-input]')].find(c => c.getAttribute('gahi-input') === name && c.closest('[gahi-object]') === scope);
+    return { name, required: !word.endsWith('?'), control };
+  });
 }
 
-function snapshot(person, draft) {
+// A control that takes input can stay disabled until it has some, so it still counts as available.
+const usable = el => !el.disabled || el.hasAttribute('gahi-uses');
+
+const verbInfo = el => ({
+  el,
+  name: el.getAttribute('gahi-verb'),
+  risk: el.getAttribute('gahi-risk'),
+  about: el.getAttribute('gahi-about'),
+  after: el.getAttribute('gahi-after'),
+  inputs: inputsOf(el),
+});
+
+function readScreen() {
   const objects = new Map();
   for (const el of document.querySelectorAll('[gahi-object]')) {
     if (el.closest('[hidden]')) continue;
@@ -88,20 +119,41 @@ function snapshot(person, draft) {
       if (!obj.fields.some(x => x.name === name)) obj.fields.push({ name, value: f.textContent.trim(), from: f.getAttribute('gahi-from') });
     }
     for (const v of own(el, '[gahi-verb]')) {
-      if (!v.disabled && !obj.verbs.some(x => x.name === v.getAttribute('gahi-verb'))) obj.verbs.push(verbInfo(v));
+      if (usable(v) && !obj.verbs.some(x => x.name === v.getAttribute('gahi-verb'))) obj.verbs.push(verbInfo(v));
     }
   }
-  const known = ref => (objects.has(ref) ? ref : null);
   return {
     screen: document.querySelector('[gahi-screen]')?.getAttribute('gahi-screen') ?? document.title,
-    person: { on: known(person.on), pointing: known(person.pointing) },
+    url: location.pathname + location.search,
     objects: [...objects.values()],
-    verbs: [...document.querySelectorAll('[gahi-verb]')].filter(v => !v.closest('[gahi-object]') && !v.closest('[hidden]') && !v.disabled).map(verbInfo),
-    draft,
+    verbs: [...document.querySelectorAll('[gahi-verb]')].filter(v => !v.closest('[gahi-object]') && !v.closest('[hidden]') && usable(v)).map(verbInfo),
   };
 }
 
-function setValue(control, value) {
+const plainVerb = ({ name, risk, about, after, inputs }) => ({ name, risk, about, after, inputs: inputs.map(i => ({ name: i.name, required: i.required })) });
+
+function snapshot() {
+  const snap = readScreen();
+  return { ...snap, objects: snap.objects.map(o => ({ ...o, verbs: o.verbs.map(plainVerb) })), verbs: snap.verbs.map(plainVerb) };
+}
+
+function setValue(found, value) {
+  const control = found.isContentEditable || found.matches('input,textarea,select') ? found : found.querySelector('[contenteditable=true],input,textarea,select');
+  if (control.isContentEditable) {
+    // insertText is what typing produces, so rich editors update their own state.
+    control.focus();
+    document.execCommand('selectAll');
+    if (!value.includes('\n')) {
+      document.execCommand('insertText', false, value);
+      return;
+    }
+    // Rich editors lose or join lines from insertText, but they all handle a paste of several lines.
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/plain', value);
+    const paste = new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true });
+    if (control.dispatchEvent(paste)) throw new Error('This editor can\'t take text with several lines.');
+    return;
+  }
   const proto = { TEXTAREA: HTMLTextAreaElement, SELECT: HTMLSelectElement }[control.tagName] ?? HTMLInputElement;
   // The native setter, so frameworks that track a control's value still see the change.
   Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(control, value);
@@ -109,14 +161,58 @@ function setValue(control, value) {
 }
 
 // Running the real control means an agent goes through the same code and checks as a person.
-function fire(el, input) {
-  if (el.tagName !== 'FORM') {
-    el.click();
+async function fire(v, input, relocate) {
+  const { el } = v;
+  if (el.tagName === 'FORM') {
+    for (const [name, value] of Object.entries(input)) setValue(el.elements[name], value);
+    if (!el.checkValidity()) throw new Error('The form refused that input.');
+    el.requestSubmit();
     return;
   }
-  for (const [name, value] of Object.entries(input)) setValue(el.elements[name], value);
-  if (!el.checkValidity()) throw new Error('The form refused that input.');
-  el.requestSubmit();
+  for (const { name, control } of v.inputs) {
+    if (!Object.hasOwn(input, name)) continue;
+    if (!control) throw new Error(`The control for ${name} isn't on screen.`);
+    setValue(control, input[name]);
+  }
+  if (v.inputs.length) await settled({ quiet: 100, max: 800 });
+  // The app may have swapped a disabled control for an enabled one once it saw the input.
+  const current = v.inputs.length ? relocate() : v;
+  if (!current || current.el.disabled) throw new Error('The app kept that control disabled, so nothing happened.');
+  current.el.click();
+}
+
+async function run({ object, verb, input = {}, via, reveal = false }) {
+  const find = () => {
+    const snap = readScreen();
+    return object === undefined ? snap.verbs.find(v => v.name === verb) : snap.objects.find(o => o.ref === object)?.verbs.find(v => v.name === verb);
+  };
+  let v = find();
+  if (!v && reveal && object !== undefined) {
+    const verbs = readScreen().objects.find(o => o.ref === object)?.verbs ?? [];
+    (verbs.find(x => x.name === via) ?? verbs.find(x => riskOf(x.risk) === 'view'))?.el.click();
+    await settled();
+    v = find();
+  }
+  if (!v) return { error: `${object ?? 'This screen'} has no verb ${quote(verb)} right now.` };
+  try {
+    await fire(v, input, find);
+  } catch (e) {
+    return { error: e.message };
+  }
+  await settled();
+  return { ok: true };
+}
+
+function takeKey() {
+  const fromLink = new URLSearchParams(location.hash.slice(1)).get('key');
+  // Apps route and redirect, so the key can't stay in the URL.
+  if (fromLink) history.replaceState(history.state, '', location.pathname + location.search);
+  try {
+    if (fromLink) sessionStorage.setItem('gahi-key', fromLink);
+    return fromLink ?? sessionStorage.getItem('gahi-key');
+  } catch {
+    return fromLink;
+  }
 }
 
 function loadRules() {
@@ -129,36 +225,108 @@ function loadRules() {
   }
 }
 
-export function mount({ root = document.body } = {}) {
-  let rules = loadRules();
-  const draft = [];
-  const log = [];
+// With no server, the session lives right here and the agent shares this screen.
+function localSession() {
+  const session = createSession({ screen: { snapshot, run }, rules: loadRules() });
+  const { setRules } = session;
+  session.setRules = next => {
+    try { localStorage.setItem('gahi-rules', JSON.stringify(next)); } catch { /* A private window can refuse storage, and rules then last until reload. */ }
+    setRules(next);
+  };
+  return session;
+}
+
+// With a server, the session lives there, so it keeps going after this page closes.
+function serverSession(key) {
   const listeners = new Set();
+  let state = { rules: defaultRules(), draft: [], log: [], problem: '', person: {}, link: null };
+  const api = (path, body) => fetch(path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'x-gahi-key': key, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  let lastPerson = '';
+  async function refresh() {
+    try {
+      const res = await api('/gahi/state');
+      if (!res.ok) return;
+      const next = await res.json();
+      const changed = quote(next) !== quote(state);
+      state = next;
+      if (changed) for (const fn of listeners) fn();
+    } catch { /* The server may be restarting, and the next tick tries again. */ }
+  }
+  const send = async (path, body) => {
+    const res = await api(path, body);
+    await refresh();
+    return res;
+  };
+  refresh();
+  setInterval(refresh, 1000);
+  return {
+    rules: () => state.rules,
+    draft: () => state.draft,
+    log: () => state.log,
+    problem: () => state.problem,
+    person: () => state.person,
+    linkUrl: () => state.link,
+    setRules: next => {
+      state = { ...state, rules: next };
+      for (const fn of listeners) fn();
+      return send('/gahi/rules', next);
+    },
+    setPerson: next => {
+      const text = quote(next);
+      if (text === lastPerson) return;
+      lastPerson = text;
+      api('/gahi/person', next).catch(() => { lastPerson = ''; });
+    },
+    approve: () => send('/gahi/approve', {}),
+    discard: () => send('/gahi/discard', {}),
+    // The hidden tab needs what this tab signed in with. Cookies travel on the request, and this adds local storage.
+    link: () => {
+      const storage = {};
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const name = localStorage.key(i);
+        if (!name.startsWith('gahi-')) storage[name] = localStorage.getItem(name);
+      }
+      return send('/gahi/link', { storage });
+    },
+    stop: () => send('/gahi/unlink', {}),
+    read: async () => (await api('/gahi/read')).text(),
+    act: async (_agent, request) => {
+      const res = await api('/gahi/act', request);
+      return { status: res.status, text: await res.text() };
+    },
+    on: fn => listeners.add(fn),
+  };
+}
+
+export function mount({ root = document.body } = {}) {
+  window.gahiScreen = Object.freeze({ snapshot, run });
+  // The agent's hidden tab only needs the screen. Rules, drafts and buttons are for the person's tab.
+  if (window.__gahiAgentTab) return null;
+
+  const key = takeKey();
+  const session = key ? serverSession(key) : localSession();
   const person = { on: null, pointing: null };
-  const key = new URLSearchParams(location.hash.slice(1)).get('key');
   let draftOpen = false;
   let panelOpen = false;
-  let link = null;
-  let problem = '';
   let toastTimer;
   let panelKey = '';
   let barKey = '';
+  let seen = session.log().length;
+  let linkError = '';
 
-  const snap = () => snapshot(person, draft);
-  const read = door => render(snap(), rules, door);
-  const locate = (ref, verb, from = snap()) => (ref === undefined
-    ? from.verbs.find(v => v.name === verb)
-    : from.objects.find(o => o.ref === ref)?.verbs.find(v => v.name === verb));
   const objectEls = ref => [...document.querySelectorAll('[gahi-object]')].filter(el => el.getAttribute('gahi-object') === ref);
 
-  // ---------- the page's own small interface ----------
   const toast = h('div', { class: 'gahi-ui gahi-toast', role: 'status', hidden: true });
   const draftBtn = h('button', { type: 'button', class: 'gahi-draft-btn', hidden: true, onclick: () => setDraftOpen(true) });
   const agentBtn = h('button', { type: 'button', class: 'gahi-agent-btn', text: 'Agent', onclick: () => setPanelOpen(!panelOpen) });
   const dock = h('div', { class: 'gahi-ui gahi-dock' }, draftBtn, agentBtn);
   const panel = h('aside', { class: 'gahi-ui gahi-panel', 'aria-label': 'Agent', hidden: true });
   const bar = h('div', { class: 'gahi-ui gahi-bar', role: 'group', 'aria-label': 'Draft', hidden: true });
-  const hint = h('p', { class: 'gahi-ui gahi-hint', 'aria-hidden': 'true', text: 'This page has an agent view. In this page, gahi.read() returns it as text.' });
+  const hint = h('p', { class: 'gahi-ui gahi-hint', 'aria-hidden': 'true', text: 'This page has an agent view. In this page, await gahi.read() returns it as text.' });
   root.append(h('style', { class: 'gahi-ui', text: STYLE }), toast, dock, panel, bar, hint);
   document.head.append(h('meta', { name: 'gahi', content: VERSION }));
 
@@ -169,40 +337,37 @@ export function mount({ root = document.body } = {}) {
     toastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
   }
 
-  function setRules(next) {
-    rules = next;
-    try { localStorage.setItem('gahi-rules', JSON.stringify(rules)); } catch { /* A private window can refuse storage, and rules then last until reload. */ }
-    paint();
-  }
-
   function setPanelOpen(next) {
     panelOpen = next;
     panel.hidden = !next;
+    panelKey = '';
     paint();
   }
 
   function setDraftOpen(next) {
-    draftOpen = next && draft.length > 0;
+    draftOpen = next && session.draft().length > 0;
     paint();
   }
 
   function paintRules() {
+    const rules = session.rules();
     const seg = (current, choices, pick) => h('span', { class: 'gahi-seg' }, choices.map(o => h('button', {
       type: 'button', text: OUTCOMES[o], 'aria-pressed': String(current === o), onclick: () => pick(o),
     })));
-    const verbs = [...new Set([...snap().objects.flatMap(o => o.verbs), ...snap().verbs].map(v => v.name).concat(Object.keys(rules.verbs)))].sort();
+    const snap = readScreen();
+    const verbs = [...new Set([...snap.objects.flatMap(o => o.verbs), ...snap.verbs].map(v => v.name).concat(Object.keys(rules.verbs)))].sort();
     return h('section', {},
       h('h2', { text: 'Rules' }),
       LEVELS.map(level => h('div', { class: 'gahi-rule' }, h('span', { text: LEVEL_LABEL[level] }),
-        seg(rules.risk[level], level === 'view' ? ['do', 'block'] : ['do', 'draft', 'block'], o => setRules({ ...rules, risk: { ...rules.risk, [level]: o } })))),
+        seg(rules.risk[level], level === 'view' ? ['do', 'block'] : ['do', 'draft', 'block'], o => session.setRules({ ...rules, risk: { ...rules.risk, [level]: o } })))),
       h('label', { class: 'gahi-row' },
-        h('input', { type: 'checkbox', checked: rules.draftAll, onchange: e => setRules({ ...rules, draftAll: e.target.checked }) }),
+        h('input', { type: 'checkbox', checked: rules.draftAll, onchange: e => session.setRules({ ...rules, draftAll: e.target.checked }) }),
         'Put every change on a draft'),
       verbs.length ? h('details', {}, h('summary', { text: 'Rules for one verb' }), h('div', { class: 'gahi-log' }, verbs.map(name => h('label', { class: 'gahi-rule' }, name,
         h('select', {
           onchange: e => {
             const { [name]: _, ...others } = rules.verbs;
-            setRules({ ...rules, verbs: e.target.value ? { ...others, [name]: e.target.value } : others });
+            session.setRules({ ...rules, verbs: e.target.value ? { ...others, [name]: e.target.value } : others });
           },
         },
         h('option', { value: '', text: 'Use its level', selected: !Object.hasOwn(rules.verbs, name) }),
@@ -211,7 +376,8 @@ export function mount({ root = document.body } = {}) {
   }
 
   function paintLink() {
-    if (!key) return null;
+    if (!session.link) return null;
+    const link = session.linkUrl();
     const copy = h('button', {
       type: 'button',
       text: 'Copy',
@@ -220,17 +386,27 @@ export function mount({ root = document.body } = {}) {
           await navigator.clipboard.writeText(link);
           e.target.textContent = 'Copied';
         } catch {
-          e.target.previousElementSibling?.select?.();
+          e.target.closest('section').querySelector('input')?.select();
         }
       },
     });
     return h('section', {},
       h('h2', { text: 'Your agent' }),
       link
-        ? [h('p', { class: 'gahi-muted', text: 'Give your agent this link. It can use the app with your rules while this page is open.' }),
+        ? [h('p', { class: 'gahi-muted', text: 'Give your agent this link. It works in its own hidden tab with your sign-in and your rules, even after you close this page.' }),
           h('input', { type: 'text', readonly: true, value: link, 'aria-label': 'Agent link' }),
-          h('div', { class: 'gahi-row' }, copy, h('button', { type: 'button', text: 'Stop agent', onclick: stopAgent }))]
-        : h('button', { type: 'button', text: 'Link an agent', onclick: linkAgent }));
+          h('div', { class: 'gahi-row' }, copy, h('button', { type: 'button', text: 'Stop agent', onclick: () => session.stop() }))]
+        : h('button', {
+          type: 'button',
+          text: 'Link an agent',
+          onclick: async () => {
+            const res = await session.link();
+            linkError = res.ok ? '' : await res.text();
+            panelKey = '';
+            paint();
+          },
+        }),
+      linkError ? h('p', { text: linkError }) : null);
   }
 
   const logLine = e => h('div', { class: 'gahi-log-a', text: {
@@ -243,16 +419,20 @@ export function mount({ root = document.body } = {}) {
 
   function paintPanel() {
     if (!panelOpen) return;
-    const verbs = [...snap().objects.flatMap(o => o.verbs), ...snap().verbs].map(v => v.name);
-    const nextKey = quote([rules, [...new Set(verbs)], log.length, link]);
+    const snap = readScreen();
+    const verbs = [...snap.objects.flatMap(o => o.verbs), ...snap.verbs].map(v => v.name);
+    const log = session.log();
+    const nextKey = quote([session.rules(), [...new Set(verbs)], log.length, session.linkUrl?.(), linkError]);
     if (nextKey === panelKey) return;
     panelKey = nextKey;
+    const peek = h('pre');
+    session.read?.('link').then(text => { peek.textContent = text; }, () => { peek.textContent = 'Link an agent to see this.'; });
     panel.replaceChildren(...[
       h('div', { class: 'gahi-head' }, h('h2', { text: 'Agent' }), h('button', { type: 'button', text: 'Close', onclick: () => setPanelOpen(false) })),
       paintLink(),
       paintRules(),
       log.length ? h('section', {}, h('h2', { text: 'What it did' }), h('div', { class: 'gahi-log' }, log.slice(-30).reverse().map(logLine))) : null,
-      h('details', { class: 'gahi-peek' }, h('summary', { text: 'What the agent reads' }), h('pre', { text: read('link') })),
+      h('details', { class: 'gahi-peek' }, h('summary', { text: 'What the agent reads' }), peek),
     ].filter(Boolean));
   }
 
@@ -272,8 +452,8 @@ export function mount({ root = document.body } = {}) {
     for (const el of document.querySelectorAll('.gahi-mark')) el.remove();
     for (const el of document.querySelectorAll('.gahi-removed')) el.classList.remove('gahi-removed');
     if (!draftOpen) return;
-    const now = snap();
-    for (const item of draft) {
+    const now = readScreen();
+    for (const item of session.draft()) {
       const el = item.object && objectEls(item.object)[0];
       if (!el) continue;
       if (item.after === 'removed') el.classList.add('gahi-removed');
@@ -287,7 +467,9 @@ export function mount({ root = document.body } = {}) {
       barKey = '';
       return;
     }
+    const draft = session.draft();
     const away = draft.filter(item => !item.object || !objectEls(item.object).length);
+    const problem = session.problem();
     // Painting runs on every hover, and replacing a button mid-click would lose the click.
     const nextKey = quote([draft.length, away.length, problem]);
     if (nextKey === barKey) return;
@@ -295,22 +477,47 @@ export function mount({ root = document.body } = {}) {
     bar.replaceChildren(...[
       h('span', { text: `${draft.length} change${draft.length === 1 ? '' : 's'} in draft${away.length ? `, ${away.length} not on this screen` : ''}` }),
       problem ? h('span', { text: problem }) : null,
-      h('button', { type: 'button', class: 'gahi-approve', text: 'Approve', onclick: approve }),
-      h('button', { type: 'button', text: 'Discard', onclick: discard }),
+      h('button', { type: 'button', class: 'gahi-approve', text: 'Approve', onclick: () => session.approve() }),
+      h('button', { type: 'button', text: 'Discard', onclick: () => session.discard() }),
       h('button', { type: 'button', text: 'Back to app', onclick: () => setDraftOpen(false) }),
     ].filter(Boolean));
   }
 
+  function showNewActivity() {
+    const log = session.log();
+    const fresh = log.slice(seen);
+    seen = log.length;
+    for (const e of fresh.filter(x => x.type === 'ran' || x.type === 'approved')) {
+      say(`${e.by}: ${e.verb} ${e.object ?? ''}`);
+      // Only the first copy: flashing a whole open pane too would hide what changed.
+      const shown = e.object && objectEls(e.object)[0];
+      if (shown) {
+        shown.classList.remove('gahi-flash');
+        void shown.offsetWidth;
+        shown.classList.add('gahi-flash');
+      }
+    }
+  }
+
+  function reportPerson() {
+    const known = ref => (ref && objectEls(ref).length ? ref : null);
+    const screen = document.querySelector('[gahi-screen]')?.getAttribute('gahi-screen') ?? document.title;
+    session.setPerson({ on: known(person.on), pointing: known(person.pointing), url: location.pathname + location.search, screen });
+  }
+
   function paint() {
-    draftBtn.hidden = !draft.length || draftOpen;
-    draftBtn.textContent = `Draft (${draft.length})`;
-    if (!draft.length) draftOpen = false;
+    const count = session.draft().length;
+    draftBtn.hidden = !count || draftOpen;
+    draftBtn.textContent = `Draft (${count})`;
+    if (!count) draftOpen = false;
     dock.hidden = draftOpen;
+    showNewActivity();
     paintBar();
     paintMarks();
     paintPanel();
-    for (const fn of listeners) fn();
+    reportPerson();
   }
+  session.on(paint);
 
   let scheduled = false;
   function schedule() {
@@ -328,7 +535,6 @@ export function mount({ root = document.body } = {}) {
     if (changed) schedule();
   }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['gahi-object', 'gahi-state', 'gahi-verb', 'gahi-field', 'gahi-risk', 'gahi-after', 'hidden', 'disabled'] });
 
-  // ---------- where the person is ----------
   // isTrusted separates a person's real clicks from the clicks this file makes for an agent.
   const closestRef = target => (target.closest?.('.gahi-ui') ? null : target.closest?.('[gahi-object]')?.getAttribute('gahi-object') ?? null);
   document.addEventListener('click', e => {
@@ -348,136 +554,13 @@ export function mount({ root = document.body } = {}) {
     }
   });
 
-  // ---------- what an agent can do ----------
-  async function act(agent, request, door = 'link') {
-    const { verb, object, input = {}, draft: wantsDraft = false } = request ?? {};
-    const refuse = (status, text) => ({ status, text });
-    if (typeof verb !== 'string') return refuse(400, 'Send JSON with a verb, such as {"verb":"NAME","object":"TYPE:ID"}.');
-    if (object !== undefined && typeof object !== 'string') return refuse(400, 'object must be text, such as "chat:1".');
-    if (input === null || typeof input !== 'object' || Array.isArray(input)) return refuse(400, 'input must be an object.');
-    const v = locate(object, verb);
-    if (!v) return refuse(409, `${object ?? 'This screen'} has no verb ${quote(verb)} on this screen. Read the screen again. You may need to open it first.`);
-    const extra = Object.keys(input).filter(k => !v.inputs.some(i => i.name === k));
-    if (extra.length) return refuse(400, `${verb} doesn't take ${extra.map(quote).join(', ')}. It takes: ${v.inputs.map(i => i.name).join(', ') || 'nothing'}.`);
-    if (Object.values(input).some(value => typeof value !== 'string')) return refuse(400, 'Input values must be text.');
-    const missing = v.inputs.filter(i => i.required && !input[i.name]?.trim());
-    if (missing.length) return refuse(400, `${verb} needs ${missing.map(i => i.name).join(', ')}.`);
-
-    const entry = { by: agent, verb, object, input };
-    const outcome = decide(rules, verb, v.risk, wantsDraft === true);
-    if (outcome === 'block') {
-      log.push({ ...entry, type: 'blocked' });
-      paint();
-      return refuse(403, `The person's rules block ${verb}. Nothing happened.`);
-    }
-    if (outcome === 'draft') {
-      const same = draft.findIndex(d => d.verb === verb && d.object === object);
-      if (same >= 0) draft.splice(same, 1);
-      draft.push({ ...entry, risk: riskOf(v.risk), after: v.after });
-      log.push({ ...entry, type: 'drafted' });
-      paint();
-      return { status: 200, text: `In draft: ${verb} on ${object ?? 'this screen'}. Nothing changes until the person approves it.` };
-    }
-    try {
-      fire(v.el, input);
-    } catch (e) {
-      return refuse(409, e.message);
-    }
-    log.push({ ...entry, type: 'ran' });
-    await tick();
-    // Only the first copy: flashing a whole open pane too would hide what changed.
-    const shown = objectEls(object)[0];
-    if (shown) {
-      shown.classList.remove('gahi-flash');
-      void shown.offsetWidth;
-      shown.classList.add('gahi-flash');
-    }
-    say(`${agent}: ${verb} ${object ?? ''}`);
-    paint();
-    const done = `Ran ${verb} on ${object ?? 'this screen'}.`;
-    return { status: 200, text: riskOf(v.risk) === 'view' ? `${done}\n\n${read(door)}` : `${done} Read the screen to see the result.` };
-  }
-
-  async function approve() {
-    problem = '';
-    for (const item of [...draft]) {
-      let v = locate(item.object, item.verb);
-      if (!v && item.object) {
-        // The verb lives on another screen, so go there the way the agent did.
-        snap().objects.find(o => o.ref === item.object)?.verbs.find(x => riskOf(x.risk) === 'view')?.el.click();
-        await tick();
-        v = locate(item.object, item.verb);
-      }
-      if (!v) {
-        problem = `Couldn't run ${item.verb} on ${item.object}, because it's no longer on screen.`;
-        continue;
-      }
-      try {
-        fire(v.el, item.input);
-      } catch (e) {
-        problem = `${item.verb} on ${item.object}: ${e.message}`;
-        continue;
-      }
-      draft.splice(draft.indexOf(item), 1);
-      log.push({ by: item.by, verb: item.verb, object: item.object, input: item.input, type: 'approved' });
-      await tick();
-    }
-    paint();
-  }
-
-  function discard() {
-    for (const item of draft.splice(0)) log.push({ by: item.by, verb: item.verb, object: item.object, input: item.input, type: 'discarded' });
-    problem = '';
-    paint();
-  }
-
-  // ---------- the link for agents outside the browser ----------
-  const api = (path, options = {}) => fetch(path, { ...options, headers: { 'x-gahi-key': key, ...(options.body ? { 'content-type': 'application/json' } : {}) } });
-
-  async function linkAgent() {
-    const res = await api('/gahi/link', { method: 'POST', body: '{}' });
-    if (res.ok) link = (await res.json()).url;
-    paint();
-  }
-
-  async function stopAgent() {
-    await api('/gahi/unlink', { method: 'POST', body: '{}' });
-    link = null;
-    paint();
-  }
-
-  async function connect() {
-    for (;;) {
-      try {
-        const res = await api('/gahi/next');
-        if (res.status === 200) {
-          const job = await res.json();
-          const answer = job.type === 'read' ? { status: 200, text: read('link') } : await act('agent', job.body);
-          await api('/gahi/answer', { method: 'POST', body: JSON.stringify({ id: job.id, ...answer }) });
-        } else if (res.status !== 204) {
-          await new Promise(resolve => { setTimeout(resolve, 2000); });
-        }
-      } catch {
-        await new Promise(resolve => { setTimeout(resolve, 2000); });
-      }
-    }
-  }
-
   // An agent driving this browser can use this instead of screenshots.
   window.gahi = Object.freeze({
     version: VERSION,
-    read: () => read('page'),
-    act: async request => (await act('agent', request, 'page')).text,
+    read: () => session.read('page'),
+    act: async request => (await session.act('agent', request, 'page')).text,
   });
 
   paint();
-  if (key) connect();
-
-  return {
-    read, act, approve, discard, snapshot: snap, setRules, setDraftOpen, setPanelOpen,
-    rules: () => rules,
-    draft: () => draft,
-    log: () => log,
-    on: fn => listeners.add(fn),
-  };
+  return { ...session, setDraftOpen, setPanelOpen, snapshot };
 }

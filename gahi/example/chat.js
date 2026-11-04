@@ -11,6 +11,33 @@ const start = [
   { id: '9', name: 'Weekend Deals', unread: 0, messages: [{ id: '91', text: '50% off everything this weekend only.' }] },
 ];
 
+export function memoryStore() {
+  let chats = structuredClone(start);
+  let pins = 0;
+  let nextMessage = 1000;
+  const find = id => chats.find(c => c.id === id);
+  return {
+    load: async () => structuredClone(chats),
+    pin: async (id, on) => {
+      const c = find(id);
+      if (c) c.pinnedAt = on ? (pins += 1) : undefined;
+    },
+    read: async id => {
+      const c = find(id);
+      if (c) c.unread = 0;
+    },
+    reply: async (id, text) => {
+      const c = find(id);
+      if (!c) return;
+      c.messages.push({ id: String(nextMessage += 1), mine: true, text });
+      c.unread = 0;
+    },
+    remove: async id => {
+      chats = chats.filter(c => c.id !== id);
+    },
+  };
+}
+
 function h(tag, props = {}, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
@@ -22,25 +49,27 @@ function h(tag, props = {}, ...kids) {
   return el;
 }
 
-export function startChat(root) {
-  let chats = structuredClone(start);
+// pollMs keeps this screen up to date when something else, like an agent's own tab, changes the same data.
+export function startChat(root, store = memoryStore(), { pollMs } = {}) {
+  let chats = [];
+  let shown = '';
   let openId = null;
-  let pinCount = 0;
+  let typed = '';
 
   const ordered = () => [...chats].sort((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
-  const setPin = (c, on) => {
-    c.pinnedAt = on ? (pinCount += 1) : undefined;
-    render();
+  const change = async work => {
+    await work();
+    await refresh();
   };
   const stateOf = c => `unread=${c.unread} pinned=${c.pinnedAt ? 'yes' : 'no'}`;
   const pinButton = c => (c.pinnedAt
-    ? h('button', { type: 'button', class: 'pin on', title: 'Unpin', 'aria-label': `Unpin ${c.name}`, 'gahi-verb': 'unpin', 'gahi-risk': 'undoable', 'gahi-after': 'pinned=no', onclick: () => setPin(c, false) }, '\u{1F4CC}')
-    : h('button', { type: 'button', class: 'pin', title: 'Pin', 'aria-label': `Pin ${c.name}`, 'gahi-verb': 'pin', 'gahi-risk': 'undoable', 'gahi-after': 'pinned=yes', 'gahi-about': 'New pins go to the top of the list', onclick: () => setPin(c, true) }, '\u{1F4CC}'));
+    ? h('button', { type: 'button', class: 'pin on', title: 'Unpin', 'aria-label': `Unpin ${c.name}`, 'gahi-verb': 'unpin', 'gahi-risk': 'undoable', 'gahi-after': 'pinned=no', onclick: () => change(() => store.pin(c.id, false)) }, '\u{1F4CC}')
+    : h('button', { type: 'button', class: 'pin', title: 'Pin', 'aria-label': `Pin ${c.name}`, 'gahi-verb': 'pin', 'gahi-risk': 'undoable', 'gahi-after': 'pinned=yes', 'gahi-about': 'New pins go to the top of the list', onclick: () => change(() => store.pin(c.id, true)) }, '\u{1F4CC}'));
 
   function row(c) {
     const last = c.messages.at(-1);
     return h('li', { class: `row${c.id === openId ? ' open' : ''}`, 'gahi-object': `chat:${c.id}`, 'gahi-state': stateOf(c) },
-      h('button', { type: 'button', class: 'pick', 'aria-current': c.id === openId ? 'true' : null, 'gahi-verb': 'open', 'gahi-risk': 'view', onclick: () => { openId = c.id; render(); } },
+      h('button', { type: 'button', class: 'pick', 'aria-current': c.id === openId ? 'true' : null, 'gahi-verb': 'open', 'gahi-risk': 'view', onclick: () => { openId = c.id; typed = ''; render(); } },
         h('span', { class: 'face', 'aria-hidden': 'true' }, c.name[0]),
         h('span', { class: 'who' },
           h('b', { 'gahi-field': 'name' }, c.name),
@@ -50,22 +79,22 @@ export function startChat(root) {
   }
 
   function pane(c) {
-    const composer = h('textarea', { name: 'text', rows: 1, required: true, placeholder: 'Write a message', 'aria-label': 'Message' });
+    const composer = h('textarea', { name: 'text', rows: 1, required: true, placeholder: 'Write a message', 'aria-label': 'Message', oninput: e => { typed = e.target.value; } });
+    composer.value = typed;
     return h('section', { class: 'pane', 'gahi-object': `chat:${c.id}` },
       h('header', {},
         h('strong', {}, c.name),
         h('span', { class: 'tools' },
-          c.unread ? h('button', { type: 'button', 'gahi-verb': 'mark-read', 'gahi-risk': 'undoable', 'gahi-after': 'unread=0', onclick: () => { c.unread = 0; render(); } }, 'Mark read') : null,
+          c.unread ? h('button', { type: 'button', 'gahi-verb': 'mark-read', 'gahi-risk': 'undoable', 'gahi-after': 'unread=0', onclick: () => change(() => store.read(c.id)) }, 'Mark read') : null,
           h('button', {
             type: 'button',
             'gahi-verb': 'delete',
             'gahi-risk': 'permanent',
             'gahi-after': 'removed',
-            onclick: () => {
-              chats = chats.filter(x => x !== c);
+            onclick: () => change(async () => {
+              await store.remove(c.id);
               openId = null;
-              render();
-            },
+            }),
           }, 'Delete'))),
       h('div', { class: 'messages' }, c.messages.map(m => h('div', { class: `bubble${m.mine ? ' mine' : ''}`, 'gahi-object': `message:${m.id}`, 'gahi-state': `sender=${m.mine ? 'you' : 'them'}` },
         h('p', { 'gahi-field': 'text', 'gahi-from': m.mine ? null : 'other' }, m.text)))),
@@ -74,9 +103,9 @@ export function startChat(root) {
         'gahi-risk': 'outward',
         onsubmit: e => {
           e.preventDefault();
-          c.messages.push({ id: `${c.id}${Date.now()}`, mine: true, text: composer.value });
-          c.unread = 0;
-          render();
+          const text = composer.value;
+          typed = '';
+          change(() => store.reply(c.id, text));
         },
       }, composer, h('button', {}, 'Send')));
   }
@@ -89,6 +118,18 @@ export function startChat(root) {
     );
   }
 
+  async function refresh() {
+    const next = await store.load();
+    const text = JSON.stringify(next);
+    chats = next;
+    if (text !== shown) {
+      shown = text;
+      render();
+    }
+  }
+
   root.setAttribute('gahi-screen', 'Chats');
   render();
+  refresh();
+  if (pollMs) setInterval(() => refresh().catch(() => {}), pollMs);
 }
