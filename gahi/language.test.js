@@ -76,7 +76,7 @@ test('the text shows verbs, risk, outcomes, the person and how to act', () => {
 
 test('the person line is always there, so an agent knows to look for it', () => {
   assert.match(render(snap(), defaultRules()), /^person: not on anything yet$/m);
-  assert.match(render(snap(), defaultRules()), /When they say "this", read this again/);
+  assert.match(render(snap(), defaultRules()), /When they say "this" or "here", send "object":"this"/);
   assert.match(render(snap({ person: { pointing: 'chat:1' } }), defaultRules()), /^person: pointing at chat:1$/m);
 });
 

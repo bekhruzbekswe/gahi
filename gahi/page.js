@@ -502,7 +502,13 @@ export function mount({ root = document.body } = {}) {
   function reportPerson() {
     const known = ref => (ref && objectEls(ref).length ? ref : null);
     const screen = document.querySelector('[gahi-screen]')?.getAttribute('gahi-screen') ?? document.title;
-    session.setPerson({ on: known(person.on), pointing: known(person.pointing), url: location.pathname + location.search, screen });
+    const on = known(person.on);
+    // What it sits inside, so "this chat" works when the person last clicked a message in that chat.
+    const within = [];
+    for (let el = on && objectEls(on)[0].parentElement?.closest('[gahi-object]'); el; el = el.parentElement?.closest('[gahi-object]')) {
+      within.push(el.getAttribute('gahi-object'));
+    }
+    session.setPerson({ on, within, pointing: known(person.pointing), url: location.pathname + location.search, screen });
   }
 
   function paint() {

@@ -76,7 +76,8 @@ function cleanRules(body) {
 function cleanPerson(body) {
   const text = v => (typeof v === 'string' ? v.slice(0, 300) : null);
   const url = text(body?.url);
-  return { on: text(body?.on), pointing: text(body?.pointing), screen: text(body?.screen), url: url?.startsWith('/') && !url.startsWith('//') ? url : null };
+  const within = Array.isArray(body?.within) ? body.within.filter(v => typeof v === 'string').slice(0, 10) : [];
+  return { on: text(body?.on), within, pointing: text(body?.pointing), screen: text(body?.screen), url: url?.startsWith('/') && !url.startsWith('//') ? url : null };
 }
 
 function cleanStorage(body) {

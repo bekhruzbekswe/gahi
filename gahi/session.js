@@ -34,14 +34,55 @@ export function createSession({ screen, rules: startRules = defaultRules(), here
 
   const read = async (door = 'link') => render(await view(), rules, door);
 
+  // "this" is worked out at the moment of asking, so an agent's memory of the screen can't point it at the wrong thing.
+  async function resolveThis(agent, verb) {
+    const { on, within = [], url } = person;
+    if (!here()) return { error: 'The person isn\'t here right now, so "this" doesn\'t point at anything. Ask them which one they mean.' };
+    if (!on) return { error: 'The person isn\'t on anything right now, so "this" doesn\'t point at anything. Ask them which one they mean.' };
+    const candidates = [on, ...within];
+    const holder = snap => candidates.map(ref => snap.objects.find(o => o.ref === ref)).find(o => o?.verbs.some(v => v.name === verb))?.ref;
+    const allowed = v => decide(rules, v.name, v.risk) === 'do';
+    let snap = await screen.snapshot();
+    if (holder(snap)) return { ref: holder(snap) };
+    // Not on the agent's own screen yet, so go where the person is, then open it, the way a person would.
+    if (url && snap.url !== url && allowed(FOLLOW)) {
+      const went = await screen.goTo(url);
+      if (!went?.error) {
+        log.push({ by: agent, verb: FOLLOW.name, input: {}, type: 'ran' });
+        snap = await screen.snapshot();
+        if (holder(snap)) return { ref: holder(snap) };
+      }
+    }
+    for (const ref of candidates) {
+      const opener = snap.objects.find(o => o.ref === ref)?.verbs.find(v => riskOf(v.risk) === 'view' && allowed(v));
+      if (!opener) continue;
+      const opened = await screen.run({ object: ref, verb: opener.name });
+      if (opened?.error) continue;
+      lastView.set(ref, opener.name);
+      log.push({ by: agent, verb: opener.name, object: ref, input: {}, type: 'ran' });
+      snap = await screen.snapshot();
+      if (holder(snap)) return { ref: holder(snap) };
+    }
+    return { error: `The person is on ${on}, and it has no verb ${quote(verb)} right now. Read the screen to see what it has.` };
+  }
+
   const act = (agent, request, door = 'link') => serial(async () => {
-    const { verb, object, input = {}, draft: wantsDraft = false, ...unknown } = request ?? {};
+    const { verb, object: asked, input = {}, draft: wantsDraft = false, ...unknown } = request ?? {};
     const refuse = (status, text) => ({ status, text });
     const stray = Object.keys(unknown);
     if (stray.length) return refuse(400, `Unknown field ${stray.map(quote).join(', ')}. Use verb, object, input and draft, such as {"verb":"NAME","object":"TYPE:ID"}.`);
     if (typeof verb !== 'string') return refuse(400, 'Send JSON with a verb, such as {"verb":"NAME","object":"TYPE:ID"}.');
-    if (object !== undefined && typeof object !== 'string') return refuse(400, 'object must be text, such as "chat:1".');
+    if (asked !== undefined && typeof asked !== 'string') return refuse(400, 'object must be text, such as "chat:1".');
     if (input === null || typeof input !== 'object' || Array.isArray(input)) return refuse(400, 'input must be an object.');
+
+    let object = asked;
+    let meant = '';
+    if (asked === 'this') {
+      const found = await resolveThis(agent, verb);
+      if (found.error) return refuse(409, found.error);
+      object = found.ref;
+      meant = ' That\'s what the person is on.';
+    }
 
     const snap = await view();
     const v = object === undefined
@@ -71,14 +112,14 @@ export function createSession({ screen, rules: startRules = defaultRules(), here
       draft.push({ ...entry, risk: riskOf(v.risk), after: v.after, via: lastView.get(object) });
       log.push({ ...entry, type: 'drafted' });
       changed();
-      return { status: 200, text: `In draft: ${verb} on ${object ?? 'this screen'}. Nothing changes until the person approves it in the app. You can't approve it from here.` };
+      return { status: 200, text: `In draft: ${verb} on ${object ?? 'this screen'}.${meant} Nothing changes until the person approves it in the app. You can't approve it from here.` };
     }
     const result = verb === FOLLOW.name ? await screen.goTo(person.url) : await screen.run({ object, verb, input });
     if (result?.error) return refuse(409, result.error);
     log.push({ ...entry, type: 'ran' });
     if (riskOf(v.risk) === 'view' && object) lastView.set(object, verb);
     changed();
-    const done = `Ran ${verb} on ${object ?? 'this screen'}.`;
+    const done = `Ran ${verb} on ${object ?? 'this screen'}.${meant}`;
     return { status: 200, text: riskOf(v.risk) === 'view' ? `${done}\n\n${render(await view(), rules, door)}` : `${done} Read the screen to see the result.` };
   });
 

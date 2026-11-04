@@ -132,6 +132,101 @@ test('when the person has left, the agent is told and can keep working', async (
   assert.equal(ran.length, 1);
 });
 
+test('"this" means what the person is on at that moment, not what the agent remembers', async () => {
+  const { session, ran } = fixture();
+  session.setPerson({ on: 'chat:1', url: '/' });
+  const out = await session.act('agent', { verb: 'pin', object: 'this' });
+  assert.match(out.text, /Ran pin on chat:1\. That's what the person is on\./);
+  assert.deepEqual(ran.at(-1), { object: 'chat:1', verb: 'pin', input: {} });
+  assert.equal(session.log().at(-1).object, 'chat:1');
+});
+
+test('a drafted "this" names the real object, so the person sees what will change', async () => {
+  const { session } = fixture();
+  session.setPerson({ on: 'chat:1', url: '/' });
+  const out = await session.act('agent', { verb: 'delete', object: 'this' });
+  assert.match(out.text, /In draft: delete on chat:1\. That's what the person is on\./);
+  assert.equal(session.draft()[0].object, 'chat:1');
+});
+
+test('"this" fails plainly when it can\'t mean anything', async () => {
+  const nobody = fixture();
+  const none = await nobody.session.act('agent', { verb: 'pin', object: 'this' });
+  assert.equal(none.status, 409);
+  assert.match(none.text, /isn't on anything right now.*Ask them which one/);
+  const away = fixture({ here: () => false });
+  away.session.setPerson({ on: 'chat:1', url: '/' });
+  assert.match((await away.session.act('agent', { verb: 'pin', object: 'this' })).text, /isn't here right now/);
+  assert.equal(away.ran.length, 0);
+  const wrong = fixture();
+  wrong.session.setPerson({ on: 'chat:1', url: '/' });
+  assert.match((await wrong.session.act('agent', { verb: 'fly', object: 'this' })).text, /The person is on chat:1, and it has no verb "fly"/);
+});
+
+function deepFixture() {
+  // A list screen: chat:2 has only open, and delete appears once it's open. Nothing else is on screen until then.
+  const ran = [];
+  const went = [];
+  let url = '/';
+  let opened = false;
+  const session = createSession({
+    screen: {
+      snapshot: async () => ({
+        screen: 'Chats', url, verbs: [],
+        objects: url !== '/' ? [{ ref: 'note:9', in: null, state: [], fields: [], verbs: [pin] }] : [
+          { ref: 'chat:2', in: null, state: [], fields: [], verbs: opened ? [open, remove] : [open] },
+          ...(opened ? [{ ref: 'message:5', in: 'chat:2', state: [], fields: [], verbs: [] }] : []),
+        ],
+      }),
+      run: async request => {
+        ran.push(request);
+        if (request.verb === 'open') opened = true;
+        return { ok: true };
+      },
+      goTo: async address => {
+        went.push(address);
+        url = address;
+        return { ok: true };
+      },
+    },
+  });
+  return { session, ran, went };
+}
+
+test('"this" opens what the person is on when the verb needs it', async () => {
+  const { session, ran } = deepFixture();
+  session.setPerson({ on: 'chat:2', url: '/' });
+  const out = await session.act('agent', { verb: 'delete', object: 'this' });
+  assert.match(out.text, /In draft: delete on chat:2/);
+  assert.deepEqual(ran.map(r => r.verb), ['open']);
+  await session.approve();
+  assert.deepEqual(ran.at(-1), { object: 'chat:2', verb: 'delete', input: {}, via: 'open', reveal: true });
+});
+
+test('"this" can be a part of something, like a message in a chat', async () => {
+  const { session } = deepFixture();
+  session.setPerson({ on: 'message:5', within: ['chat:2'], url: '/' });
+  const out = await session.act('agent', { verb: 'delete', object: 'this' });
+  assert.match(out.text, /In draft: delete on chat:2/);
+});
+
+test('"this" follows the person to another screen', async () => {
+  const { session, went } = deepFixture();
+  session.setPerson({ on: 'note:9', url: '/note/9' });
+  const out = await session.act('agent', { verb: 'pin', object: 'this' });
+  assert.match(out.text, /Ran pin on note:9/);
+  assert.deepEqual(went, ['/note/9']);
+});
+
+test('"this" respects a rule that blocks looking around', async () => {
+  const { session, ran, went } = deepFixture();
+  session.setRules({ ...session.rules(), risk: { ...session.rules().risk, view: 'block' } });
+  session.setPerson({ on: 'chat:2', url: '/other' });
+  assert.equal((await session.act('agent', { verb: 'delete', object: 'this' })).status, 409);
+  assert.deepEqual(ran, []);
+  assert.deepEqual(went, []);
+});
+
 test('requests run one at a time, in order', async () => {
   const order = [];
   const session = createSession({
