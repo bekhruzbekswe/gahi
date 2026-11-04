@@ -8,6 +8,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "chat": "node examples/chat/server.js"
+    "chat": "node example/server.js"
   }
 }

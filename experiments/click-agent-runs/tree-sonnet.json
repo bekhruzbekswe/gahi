@@ -1,8 +1,0 @@
-[
-{"number":20,"label":"enhancement","unsure":false,"opened":true,"detail":"Body empty; owner's comment says 'Remove blade files and make it stateless and create client frontend for manual testing'","why":"Refactor to enable frontend integration; closest is new feature/improvement"},
-{"number":19,"label":"enhancement","unsure":false,"opened":true,"detail":"Body has Schema::create('transactions') migration and notes the table is for COIN transactions (redeem, reward) and payments, needing better planning","why":"New table and routes, a feature"},
-{"number":18,"label":"enhancement","unsure":false,"opened":true,"detail":"Body is a Schema::create('payment_methods') migration code block","why":"New table and routes, a feature"},
-{"number":17,"label":"enhancement","unsure":false,"opened":true,"detail":"Body is a Schema::create('users_challenges') migration code block","why":"New junction table and routes, a feature"},
-{"number":16,"label":"enhancement","unsure":false,"opened":true,"detail":"Body empty; owner's comment has a checkins Schema::create example migration and 'make enum for status'","why":"New checkin CRUD, a feature"},
-{"number":8,"label":"enhancement","unsure":false,"opened":true,"detail":"no description","why":"Title asks to add a role column to users_challanges for granular permissions; a feature change"}
-]

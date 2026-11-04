@@ -1,8 +1,0 @@
-[
-  {"number":20,"label":"enhancement","unsure":false,"opened":true,"detail":"Opening body reads 'No description provided.'; a comment asks to remove blade files, make it stateless and create a client frontend for manual testing.","why":"Refactor toward a frontend-ready API; no refactor label exists, and enhancement is the closest fit."},
-  {"number":19,"label":"enhancement","unsure":false,"opened":true,"detail":"Body contains a transactions table schema (wallet_id, checkin_id, amount, payment_id) for coin transactions and payment transactions.","why":"New table and routes for a feature."},
-  {"number":18,"label":"enhancement","unsure":false,"opened":true,"detail":"Body contains a payment_methods table schema with provider values click, payme, uzum and a card_mask column.","why":"New table and routes for a feature."},
-  {"number":17,"label":"enhancement","unsure":false,"opened":true,"detail":"Body contains a users_challenges junction table schema with user_id, challenge_id, role, agreed_to_terms_at and status defaulting to 'active'.","why":"New junction table and routes for a feature."},
-  {"number":16,"label":"enhancement","unsure":false,"opened":true,"detail":"Body contains a checkins table schema with status defaulting to 'pending' and a note saying 'make enum for status'.","why":"New CRUD for a feature."},
-  {"number":8,"label":"enhancement","unsure":false,"opened":true,"detail":"No description provided; the title asks to add a role column to users_challanges for granular challenge permissions.","why":"Adds a new capability (role-based permissions), so enhancement fits."}
-]

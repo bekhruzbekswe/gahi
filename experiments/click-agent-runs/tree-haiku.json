@@ -1,8 +1,0 @@
-[
-  {"number":8,"label":"enhancement","unsure":false,"opened":true,"detail":"no description","why":"Adds a role column to the users_challenges table for granular challenge permissions, a feature change"},
-  {"number":16,"label":"enhancement","unsure":false,"opened":true,"detail":"no description provided; comment says: make enum for status","why":"Creates checkin CRUD with a migration, new functionality"},
-  {"number":17,"label":"enhancement","unsure":false,"opened":true,"detail":"body is a Schema::create('users_challenges') migration snippet","why":"Creates a junction table and routes, new feature work"},
-  {"number":18,"label":"enhancement","unsure":false,"opened":true,"detail":"body is a Schema::create('payment_methods') migration snippet","why":"Creates payment methods table and routes, new feature work"},
-  {"number":19,"label":"enhancement","unsure":true,"opened":true,"detail":"body says the table is for coin transactions (redeem, reward) and payment transactions; 'So we need better planning for this one'","why":"New transactions table and routes, but the body asks for more planning, so the fit is less clear"},
-  {"number":20,"label":"enhancement","unsure":false,"opened":true,"detail":"no description provided; comment says: remove blade files, make it stateless, create client frontend for manual testing","why":"Refactors OAuth with Passport for frontend client integration, an improvement to existing behavior"}
-]

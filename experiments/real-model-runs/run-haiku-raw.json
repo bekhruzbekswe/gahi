@@ -1,6 +1,0 @@
-[
-  {"tool":"label","input":{"numbers":[20],"names":["refactor"],"why":"The issue asks to refactor the OAuth code with Passport for frontend client integration, which is a refactor.","unsure":false}},
-  {"tool":"label","input":{"numbers":[19,18,17,16,8],"names":["feature"],"why":"Each of these issues asks to add a new table, routes, CRUD or role to the app.","unsure":false}},
-  {"tool":"comment","input":{"number":8,"text":"Could you add more detail to this issue? Which roles should be added to users_challanges, and which permissions should each role get for the challenges domain? Also, should the table name match users_challenges from #17?","why":"No description is given, and the roles and permissions are not specified.","unsure":true}},
-  {"tool":"comment","input":{"number":19,"text":"Could you settle the design before this is built? Which fields are needed for coin transactions (redeem, reward) and which for payment transactions? Should these be one table with a type column, or two separate tables?","why":"The body says more planning is needed on how coin and payment transactions share this table.","unsure":true}}
-]

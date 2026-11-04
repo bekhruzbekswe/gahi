@@ -4,7 +4,7 @@ import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { serve } from './server.js';
 
-const root = fileURLToPath(new URL('../examples/chat/', import.meta.url));
+const root = fileURLToPath(new URL('./example/', import.meta.url));
 let server;
 let pageRunning = false;
 

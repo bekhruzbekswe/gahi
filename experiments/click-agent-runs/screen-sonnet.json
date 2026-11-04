@@ -1,8 +1,0 @@
-[
-{"number":20,"label":"enhancement","unsure":false,"opened":true,"detail":"Comment says 'Remove blade files and make it stateless and create client frontend for manual testing'; body empty","why":"Refactor of oauth is improvement work, closest to enhancement"},
-{"number":19,"label":"enhancement","unsure":false,"opened":true,"detail":"Body has a Laravel schema for a 'transactions' table (wallet_id, amount, checkin_id, payment_id) and notes it needs better planning","why":"New table and routes is a new feature"},
-{"number":18,"label":"enhancement","unsure":false,"opened":true,"detail":"Body has schema for 'payment_methods' table (provider, token, card_mask, is_default)","why":"New feature"},
-{"number":17,"label":"enhancement","unsure":false,"opened":true,"detail":"Body has schema for 'users_challenges' table with role, agreed_to_terms_at, status","why":"New feature"},
-{"number":16,"label":"enhancement","unsure":false,"opened":true,"detail":"Schema for 'checkins' table (due_date, status, proof_data); a later comment says 'make enum for status'; assigned to [a teammate]","why":"New CRUD feature"},
-{"number":8,"label":"enhancement","unsure":false,"opened":true,"detail":"no description","why":"Title asks to add a role column for granular permissions, a feature change"}
-]

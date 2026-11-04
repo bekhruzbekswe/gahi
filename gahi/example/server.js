@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { serve } from '../../kit/server.js';
+import { serve } from '../server.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const { url } = await serve({ root, files: ['index.html', 'chat.js', 'main.js'], port: 4310 });
